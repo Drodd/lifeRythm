@@ -121,6 +121,29 @@ body {
     font-size: 14px; /* 减小字体 */
 }
 
+/* 突出显示的主要属性 */
+.highlighted-stat {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.15);
+    padding: 3px 8px; /* 增加内边距 */
+    font-size: 15px; /* 增加字体大小 */
+}
+
+.stat-icon {
+    font-size: 16px; /* 减小图标 */
+    margin-right: 2px;
+}
+
+.stat-name {
+    margin-right: 5px;
+    opacity: 0.8;
+    font-size: 13px;
+}
+
+.stat-value {
+    font-weight: bold;
+}
+
 .money-stat {
     color: #ffd700; /* 金色 */
 }
@@ -139,16 +162,13 @@ body {
     border-radius: 3px;
 }
 
-.stat-icon {
-    font-size: 16px; /* 减小图标 */
-}
-
 /* 进度条样式 */
 .progress-container {
     display: flex;
     align-items: center;
-    width: 80px; /* 减小宽度 */
+    width: 70px; /* 减小宽度适应新布局 */
     gap: 3px;
+    margin-left: 2px; /* 添加左边距，与属性名分隔 */
 }
 
 .progress-container progress {
@@ -195,26 +215,53 @@ body {
     height: calc(100vh - 60px);
 }
 
-/* 轨道列表样式 */
-.track-list {
-    width: 160px; /* 压缩宽度 */
-    min-width: 120px;
+/* 合并区域样式 */
+.combined-area {
+    flex: 1;
     height: 100%;
+    position: relative;
     overflow-y: auto;
-    background-color: #333; /* 恢复为深色背景 */
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    border-right: 1px solid #444;
-    padding-bottom: 2px;
+    background-color: #444;
+    background-image: none;
+    padding: 0;
 }
 
-.track-button {
-    padding: 8px 10px; /* 减小内边距 */
-    background-color: #444; /* 恢复为深色背景 */
+/* 添加轨道按钮的样式 */
+.add-track-button {
+    padding: 8px 10px;
+    background-color: #444;
     border: none;
     border-bottom: 1px solid #555;
+    text-align: center;
+    cursor: pointer;
+    min-height: 60px;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s;
+    box-sizing: border-box;
+    color: white;
+    width: 100%;
+}
+
+.add-track-button:hover {
+    background-color: #555;
+}
+
+.add-track-button.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* 轨道按钮样式 - 现在与网格单元格在同一行 */
+.track-button {
+    padding: 4px 6px; /* 减小内边距以适应更窄的宽度 */
+    background-color: #444;
+    border: none;
+    border-bottom: 1px solid #555;
+    border-right: 1px solid #555;
     text-align: left;
     cursor: pointer;
     min-height: 60px;
@@ -224,7 +271,10 @@ body {
     justify-content: space-between;
     transition: background-color 0.3s;
     box-sizing: border-box;
-    color: white; /* 确保文字为白色 */
+    color: white;
+    grid-column: 1;
+    width: 90px; /* 设置固定宽度为90px */
+    overflow: hidden; /* 防止内容溢出 */
 }
 
 .track-button:hover {
@@ -241,17 +291,18 @@ body {
     display: flex;
     align-items: center;
     width: 100%;
+    overflow: hidden; /* 防止内容溢出 */
 }
 
 .action-emoji {
-    font-size: 22px; /* 放大表情符号 */
-    margin-right: 5px;
-    min-width: 24px;
+    font-size: 20px; /* 稍微减小表情符号大小 */
+    margin-right: 3px; /* 减小右边距 */
+    min-width: 22px;
     text-align: center;
 }
 
 .action-name {
-    font-size: 16px; /* 放大行为名称 */
+    font-size: 14px; /* 减小字体大小 */
     font-weight: bold;
     flex: 1;
     white-space: nowrap;
@@ -303,7 +354,7 @@ body {
 .playhead {
     position: absolute;
     top: 0;
-    left: 0;
+    left: 90px; /* 从动作按钮列的右侧开始，宽度从150px减少到90px */
     height: 100%;
     width: 4px; /* 增加宽度 */
     background-color: #ff5722;
@@ -396,23 +447,19 @@ body {
         padding: 5px;
     }
     
-    .track-list {
-        width: 150px;
-    }
-    
     .track-button {
         height: 60px;
         min-height: 60px; /* 在横屏模式下与网格单元格高度保持一致 */
-        padding: 5px 10px;
+        padding: 3px 5px; /* 减小内边距 */
     }
     
     .action-emoji {
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .action-effect {
-        font-size: 10px;
-        margin-left: 24px;
+        font-size: 9px;
+        margin-left: 22px;
     }
     
     .grid-cell, .placeholder-cell {
@@ -426,6 +473,7 @@ body {
         gap: 0; /* 确保横屏模式下无间距 */
         padding: 0;
         margin: 0;
+        grid-template-columns: 90px repeat(8, 1fr); /* 显式设置网格列 */
     }
 }
 
@@ -463,32 +511,42 @@ body {
         font-size: 12px;
     }
     
+    .highlighted-stat {
+        padding: 2px 5px;
+        font-size: 13px;
+    }
+    
     .stat-icon {
         font-size: 14px;
+    }
+    
+    .stat-name {
+        font-size: 11px;
+        margin-right: 3px;
+    }
+    
+    .progress-container {
+        width: 60px;
     }
     
     .secondary-stats {
         font-size: 10px;
     }
     
-    /* 更加压缩左侧列表 */
-    .track-list {
-        width: 140px;
-    }
-    
     .track-button {
-        padding: 6px 8px;
+        padding: 4px 6px;
         min-height: 58px;
         height: 58px;
+        width: 90px;
     }
     
     .action-emoji {
-        font-size: 20px;
-        margin-right: 4px;
+        font-size: 18px;
+        margin-right: 3px;
     }
     
     .action-name {
-        font-size: 14px;
+        font-size: 13px;
     }
     
     .action-effect {
@@ -512,7 +570,7 @@ body {
     }
     
     #gridContainer {
-        grid-template-columns: repeat(8, 1fr); /* 竖屏模式减少列数 */
+        grid-template-columns: 90px repeat(8, 1fr); /* 竖屏模式使用相同的列配置 */
     }
     
     .track-button, .grid-cell, .placeholder-cell {

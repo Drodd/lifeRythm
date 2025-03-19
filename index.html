@@ -23,10 +23,7 @@
             </div>
         </div>
         <div class="main-content debug-outline">
-            <div class="track-list debug-outline">
-                <button id="addTrackButton" class="track-button" disabled>需要见闻值解锁</button>
-            </div>
-            <div class="composition-area debug-outline">
+            <div class="combined-area debug-outline">
                 <div id="gridContainer" class="debug-outline"></div>
                 <div class="playhead"></div>
             </div>
@@ -50,7 +47,7 @@
         
         // 在DOM加载完成后检查关键元素
         document.addEventListener('DOMContentLoaded', () => {
-            const checkElements = ['statsContainer', 'gridContainer', 'trackList', 'composition-area'];
+            const checkElements = ['statsContainer', 'gridContainer', 'combined-area'];
             const missing = [];
             
             checkElements.forEach(id => {

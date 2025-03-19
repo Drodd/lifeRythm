@@ -57,30 +57,27 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 获取DOM元素函数，在初始化和restructureHeader后调用
     function getDOMElements() {
-        trackList = document.querySelector('.track-list');
+        trackList = null; // 不再使用轨道列表
         gridContainer = document.getElementById('gridContainer');
         playButton = document.getElementById('playButton');
         resetButton = document.getElementById('resetButton');
         playCount = document.getElementById('playCount');
         playLimit = document.getElementById('playLimit');
-        addTrackButton = document.getElementById('addTrackButton');
         playhead = document.querySelector('.playhead');
         statsContainer = document.getElementById('statsContainer');
-        compositionArea = document.querySelector('.composition-area');
+        compositionArea = document.querySelector('.combined-area');
         
         // 检查是否所有必要的元素都被找到
-        if (!trackList || !gridContainer || !playButton || !resetButton || 
-            !playCount || !playLimit || !addTrackButton || !playhead || 
+        if (!gridContainer || !playButton || !resetButton || 
+            !playCount || !playLimit || !playhead || 
             !statsContainer || !compositionArea) {
             console.error('DOM元素获取失败，页面可能无法正常初始化');
             console.log('缺失元素: ', 
-                !trackList ? 'trackList ' : '',
                 !gridContainer ? 'gridContainer ' : '',
                 !playButton ? 'playButton ' : '',
                 !resetButton ? 'resetButton ' : '',
                 !playCount ? 'playCount ' : '',
                 !playLimit ? 'playLimit ' : '',
-                !addTrackButton ? 'addTrackButton ' : '',
                 !playhead ? 'playhead ' : '',
                 !statsContainer ? 'statsContainer ' : '',
                 !compositionArea ? 'compositionArea ' : ''
@@ -205,19 +202,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const statsRows = document.createElement('div');
         statsRows.className = 'stats-rows';
         
-        // 创建一级属性行（金钱、欲望、见闻）
+        // 创建一级属性行（金钱、见闻、欲望）
         const primaryStats = document.createElement('div');
         primaryStats.className = 'primary-stats';
         
-        // 创建二级属性行（效率、耐心）
+        // 创建二级属性行（见闻、效率、耐心）
         const secondaryStats = document.createElement('div');
         secondaryStats.className = 'secondary-stats';
         
-        // 添加一级属性
+        // 添加一级属性 - 金钱（突出显示）
         const moneyItem = document.createElement('div');
-        moneyItem.className = 'primary-stat money-stat';
-        moneyItem.innerHTML = `<span class="stat-icon">💰</span><span>${playerStats.金钱}</span>`;
+        moneyItem.className = 'primary-stat money-stat highlighted-stat';
+        moneyItem.innerHTML = `<span class="stat-icon">💰</span><span class="stat-name">金钱</span><span class="stat-value">${playerStats.金钱}</span>`;
         primaryStats.appendChild(moneyItem);
+        
+        // 添加一级属性 - 见闻（突出显示）
+        const knowledgeItem = document.createElement('div');
+        knowledgeItem.className = 'primary-stat knowledge-stat highlighted-stat';
+        knowledgeItem.innerHTML = `<span class="stat-icon">📚</span><span class="stat-name">见闻</span><span class="stat-value">${playerStats.见闻}</span>`;
+        primaryStats.appendChild(knowledgeItem);
         
         // 欲望属性（使用进度条）
         const desireItem = document.createElement('div');
@@ -245,23 +248,18 @@ document.addEventListener('DOMContentLoaded', () => {
         progressContainer.appendChild(progressText);
         
         // 设置标签和进度条
-        desireItem.innerHTML = `<span class="stat-icon">🔥</span>`;
+        desireItem.innerHTML = `<span class="stat-icon">🔥</span><span class="stat-name">欲望</span>`;
         desireItem.appendChild(progressContainer);
         primaryStats.appendChild(desireItem);
         
-        // 知识属性
-        const knowledgeItem = document.createElement('div');
-        knowledgeItem.className = 'primary-stat knowledge-stat';
-        knowledgeItem.innerHTML = `<span class="stat-icon">📚</span><span>${playerStats.见闻}</span>`;
-        primaryStats.appendChild(knowledgeItem);
-        
-        // 添加二级属性
+        // 添加二级属性 - 效率
         const efficiencyItem = document.createElement('div');
         efficiencyItem.className = 'secondary-stat';
         efficiencyItem.title = '效率决定了每个节拍可激活的最大行动数量';
         efficiencyItem.innerHTML = `效率: <span>${playerStats.效率}</span>`;
         secondaryStats.appendChild(efficiencyItem);
         
+        // 添加二级属性 - 耐心
         const patienceItem = document.createElement('div');
         patienceItem.className = 'secondary-stat';
         patienceItem.title = '耐心决定了一个行动可以连续激活的最大数量';
@@ -282,6 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const gridContainer = document.getElementById('gridContainer');
         gridContainer.innerHTML = '';
         gridContainer.style.display = 'grid';
+        // 减少行动名称区域宽度至原来的60%（从150px减少到90px）
+        gridContainer.style.gridTemplateColumns = `90px repeat(${GRID_COLUMNS}, 1fr)`;
         
         // 创建网格
         for (let row = 0; row < addedActions.length; row++) {
@@ -292,7 +292,70 @@ document.addEventListener('DOMContentLoaded', () => {
                 noteData[actionId] = {};
             }
             
-            // 为每个动作创建8列
+            // 首先创建轨道按钮作为第一列
+            const button = document.createElement('button');
+            button.className = 'track-button';
+            button.setAttribute('data-action', actionId);
+            button.setAttribute('data-row', row);
+            button.style.gridRow = row + 1;
+            button.style.gridColumn = 1;
+            
+            // 创建标题行（包含emoji和名称）
+            const actionHeader = document.createElement('div');
+            actionHeader.className = 'action-header';
+            
+            // 创建emoji容器
+            const emojiSpan = document.createElement('span');
+            emojiSpan.className = 'action-emoji';
+            emojiSpan.textContent = ACTION_EMOJIS[actionId] || '';
+            actionHeader.appendChild(emojiSpan);
+            
+            // 创建行动名称
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'action-name';
+            nameSpan.textContent = actionId;
+            actionHeader.appendChild(nameSpan);
+            
+            // 将标题行添加到按钮
+            button.appendChild(actionHeader);
+            
+            // 创建效果容器
+            const effectSpan = document.createElement('div');
+            effectSpan.className = 'action-effect';
+            
+            // 简化行动效果显示
+            if (ACTION_EFFECTS[actionId]) {
+                // 遍历属性影响
+                Object.entries(ACTION_EFFECTS[actionId]).forEach(([stat, value]) => {
+                    // 创建效果图标
+                    const effectIconSpan = document.createElement('span');
+                    effectIconSpan.className = 'effect-icon';
+                    
+                    // 根据属性类型选择图标
+                    let icon = '';
+                    if (stat === '金钱') icon = '💰';
+                    else if (stat === '见闻') icon = '📚';
+                    else if (stat === '欲望') icon = '🔥';
+                    
+                    // 添加+/-符号
+                    if (value > 0) {
+                        effectIconSpan.className += ' positive-effect';
+                        effectIconSpan.textContent = `${icon}+`;
+                    } else {
+                        effectIconSpan.className += ' negative-effect';
+                        effectIconSpan.textContent = `${icon}-`;
+                    }
+                    
+                    effectSpan.appendChild(effectIconSpan);
+                });
+            }
+            
+            button.appendChild(effectSpan);
+            
+            // 将按钮添加到网格
+            gridContainer.appendChild(button);
+            
+            // 为每个动作创建8列的网格单元格
             for (let col = 0; col < GRID_COLUMNS; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell';
@@ -300,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell.setAttribute('data-column', col);
                 cell.setAttribute('data-row', row);
                 cell.style.gridRow = row + 1; // 确保精确的网格位置
-                cell.style.gridColumn = col + 1;
+                cell.style.gridColumn = col + 2; // +2 是因为第一列是轨道按钮
                 
                 // 检查是否已经有音符
                 if (noteData[actionId][col]) {
@@ -321,14 +384,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // 添加一个额外的空白行作为"+"按钮的对应物，确保两边高度一致
+        // 添加"+"按钮作为最后一行的第一列
+        const addButton = document.createElement('button');
+        addButton.className = 'track-button';
+        addButton.id = 'addTrackButtonInGrid'; // 新ID，避免与原来的冲突
+        addButton.disabled = true;
+        addButton.textContent = "需要见闻值解锁";
+        addButton.style.gridRow = addedActions.length + 1;
+        addButton.style.gridColumn = 1;
+        addButton.addEventListener('click', updateUnlockButtonState);
+        gridContainer.appendChild(addButton);
+        
+        // 替换原来的addTrackButton的引用
+        addTrackButton = addButton;
+        
+        // 添加一个额外的空白行作为最后一行的其余列
         for (let col = 0; col < GRID_COLUMNS; col++) {
             const placeholderCell = document.createElement('div');
             placeholderCell.className = 'grid-cell placeholder-cell';
             placeholderCell.setAttribute('data-column', col);
             placeholderCell.setAttribute('data-row', addedActions.length);
             placeholderCell.style.gridRow = addedActions.length + 1; // 确保精确的网格位置
-            placeholderCell.style.gridColumn = col + 1;
+            placeholderCell.style.gridColumn = col + 2; // +2 是因为第一列是轨道按钮
             placeholderCell.style.pointerEvents = 'none'; // 禁用交互
             
             // 添加占位符图标
@@ -346,71 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 设置网格容器高度
         gridContainer.style.height = `${totalHeight}px`;
-        
-        // 同步滚动
-        syncScroll();
-    }
-    
-    // 同步滚动
-    function syncScroll() {
-        // 移除之前的事件监听器
-        compositionArea.removeEventListener('scroll', compositionArea.handleScroll);
-        trackList.removeEventListener('scroll', trackList.handleScroll);
-        
-        // 防止滚动事件循环的标志
-        let isScrolling = false;
-        
-        // 谱曲区滚动处理函数
-        function handleCompositionScroll() {
-            if (!isScrolling) {
-                isScrolling = true;
-                // 使用requestAnimationFrame确保更流畅的同步
-                requestAnimationFrame(() => {
-                    trackList.scrollTop = compositionArea.scrollTop;
-                    setTimeout(() => {
-                        isScrolling = false;
-                    }, 10);
-                });
-            }
-        }
-        
-        // 行动列表滚动处理函数
-        function handleTrackListScroll() {
-            if (!isScrolling) {
-                isScrolling = true;
-                // 使用requestAnimationFrame确保更流畅的同步
-                requestAnimationFrame(() => {
-                    compositionArea.scrollTop = trackList.scrollTop;
-                    setTimeout(() => {
-                        isScrolling = false;
-                    }, 10);
-                });
-            }
-        }
-        
-        // 添加新的事件监听器
-        compositionArea.addEventListener('scroll', handleCompositionScroll, { passive: true });
-        trackList.addEventListener('scroll', handleTrackListScroll, { passive: true });
-        
-        // 立即同步滚动位置
-        compositionArea.scrollTop = trackList.scrollTop;
-        
-        // 存储处理函数的引用，以便在将来可以移除
-        compositionArea.handleScroll = handleCompositionScroll;
-        trackList.handleScroll = handleTrackListScroll;
-    }
-    
-    // 重新同步滚动位置（在可能失去同步的操作后调用）
-    function resyncScroll() {
-        // 确保两个区域的滚动位置相同
-        requestAnimationFrame(() => {
-            const scrollTop = Math.min(
-                trackList.scrollTop, 
-                trackList.scrollHeight - trackList.clientHeight
-            );
-            trackList.scrollTop = scrollTop;
-            compositionArea.scrollTop = scrollTop;
-        });
     }
     
     // 检查是否超过耐心限制（连续激活的数量）
@@ -605,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 播放声音并更新玩家属性
-    function playSound(action, updateStats = false) {
+    function playSound(actionId, updateStats = false) {
         try {
             if (!audioContext || audioContext.state !== 'running') {
                 console.warn('音频上下文未准备好:', audioContext?.state);
@@ -613,13 +625,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // 确保音频缓冲区存在
-            if (!audioBuffers[action]) {
-                console.warn('未找到音效:', action);
+            if (!audioBuffers[actionId]) {
+                console.warn('未找到音效:', actionId);
                 return;
             }
             
             const source = audioContext.createBufferSource();
-            source.buffer = audioBuffers[action];
+            source.buffer = audioBuffers[actionId];
             
             // 创建增益节点控制音量
             const gainNode = audioContext.createGain();
@@ -638,8 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let energySubstitution = false;
                 
                 // 应用行动本身的属性影响
-                if (ACTION_EFFECTS[action]) {
-                    const effects = ACTION_EFFECTS[action];
+                if (ACTION_EFFECTS[actionId]) {
+                    const effects = ACTION_EFFECTS[actionId];
                     
                     // 应用每个属性的影响
                     Object.entries(effects).forEach(([stat, value]) => {
@@ -658,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // 炒股特殊效果：随机改变金钱（-10%到10%之间）
-                if (action === '炒股' && playerStats.金钱 > 0) {
+                if (actionId === '炒股' && playerStats.金钱 > 0) {
                     // 随机生成-10到10之间的数字作为百分比
                     const randomPercent = (Math.random() * 20 - 10) / 100;
                     // 计算金钱变化值（四舍五入到整数）
@@ -668,9 +680,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // 显示炒股结果提示
                     if (moneyChange > 0) {
-                        showStockResultMessage(moneyChange, true);
+                        showStockResultMessage(moneyChange, true); // 盈利
                     } else if (moneyChange < 0) {
-                        showStockResultMessage(Math.abs(moneyChange), false);
+                        showStockResultMessage(Math.abs(moneyChange), false); // 亏损
                     }
                 }
                 
@@ -712,10 +724,18 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 计算播放头位置（0到1范围）
             const position = (elapsedTime % ANIMATION_DURATION) / ANIMATION_DURATION;
-            const leftPos = position * 100;
             
-            // 更新播放头位置
-            playhead.style.left = `${leftPos}%`;
+            // 获取节拍区域的宽度 (总宽度减去动作按钮列的宽度)
+            const gridRect = gridContainer.getBoundingClientRect();
+            const totalWidth = gridRect.width;
+            const beatAreaWidth = totalWidth - 90; // 90px是动作按钮列的宽度
+            
+            // 计算播放头位置
+            // 起始位置是90px，然后根据position在节拍区域内移动
+            const leftPos = 90 + (position * beatAreaWidth);
+            
+            // 更新播放头位置 (使用px而不是百分比)
+            playhead.style.left = `${leftPos}px`;
             
             // 计算当前列
             const currentColumn = Math.floor(position * GRID_COLUMNS);
@@ -879,7 +899,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 更新所有行动按钮样式
     function updateAllActionButtonStyles() {
-        const actionButtons = trackList.querySelectorAll('.track-button:not(#addTrackButton)');
+        // 使用gridContainer而不是trackList
+        const actionButtons = gridContainer.querySelectorAll('.track-button:not(#addTrackButtonInGrid)');
         actionButtons.forEach((button, index) => {
             if (index < addedActions.length) {
                 updateActionButtonStyle(button, addedActions[index].id);
@@ -887,73 +908,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 初始化轨道按钮
+    // 初始化轨道按钮 - 现在只是一个空函数，因为按钮在initGrid中创建
     function initTrackButtons() {
-        // 清空现有轨道按钮
-        const trackButtons = trackList.querySelectorAll('.track-button:not(#addTrackButton)');
-        trackButtons.forEach(button => button.remove());
-        
-        // 为每个添加的行动创建一个按钮
-        addedActions.forEach(action => {
-            const button = document.createElement('button');
-            button.className = 'track-button';
-            
-            // 创建标题行（包含emoji和名称）
-            const actionHeader = document.createElement('div');
-            actionHeader.className = 'action-header';
-            
-            // 创建emoji容器
-            const emojiSpan = document.createElement('span');
-            emojiSpan.className = 'action-emoji';
-            emojiSpan.textContent = ACTION_EMOJIS[action.id] || '';
-            actionHeader.appendChild(emojiSpan);
-            
-            // 创建行动名称
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'action-name';
-            nameSpan.textContent = action.name;
-            actionHeader.appendChild(nameSpan);
-            
-            // 将标题行添加到按钮
-            button.appendChild(actionHeader);
-            
-            // 创建效果容器
-            const effectSpan = document.createElement('div');
-            effectSpan.className = 'action-effect';
-            
-            // 简化行动效果显示
-            if (ACTION_EFFECTS[action.id]) {
-                // 遍历属性影响
-                Object.entries(ACTION_EFFECTS[action.id]).forEach(([stat, value]) => {
-                    // 创建效果图标
-                    const effectIconSpan = document.createElement('span');
-                    effectIconSpan.className = 'effect-icon';
-                    
-                    // 根据属性类型选择图标
-                    let icon = '';
-                    if (stat === '金钱') icon = '💰';
-                    else if (stat === '见闻') icon = '📚';
-                    else if (stat === '欲望') icon = '🔥';
-                    
-                    // 添加+/-符号
-                    if (value > 0) {
-                        effectIconSpan.className += ' positive-effect';
-                        effectIconSpan.textContent = `${icon}+`;
-                    } else {
-                        effectIconSpan.className += ' negative-effect';
-                        effectIconSpan.textContent = `${icon}-`;
-                    }
-                    
-                    effectSpan.appendChild(effectIconSpan);
-                });
-            }
-            
-            // 添加效果容器到按钮
-            button.appendChild(effectSpan);
-            
-            // 添加到列表
-            trackList.insertBefore(button, addTrackButton);
-        });
+        // 不需要做任何事情，按钮已经在initGrid中创建
+        console.log("轨道按钮已在initGrid中创建");
     }
     
     // 添加新行动
@@ -1041,37 +999,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 设置行动按钮样式
         updateActionButtonStyle(newButton, actionId);
         
-        // 在"+"按钮之前插入新行动
-        trackList.insertBefore(newButton, addTrackButton);
-        
         // 初始化该行动的音符数据
         noteData[actionId] = {};
         
         // 重新初始化网格
         initGrid();
         
-        // 确保滚动同步
-        resyncScroll();
-        
         // 更新解锁按钮状态
         updateUnlockButtonState();
-        
-        // 添加新行动后自动滚动到底部，使新解锁的行动可见
-        setTimeout(() => {
-            // 计算需要滚动的位置 - 确保新行动在视图中
-            const newButtonRect = newButton.getBoundingClientRect();
-            const containerRect = trackList.getBoundingClientRect();
-            
-            // 如果新行动不在视图中，滚动到适当位置
-            if (newButtonRect.bottom > containerRect.bottom) {
-                const maxScroll = trackList.scrollHeight - trackList.clientHeight;
-                trackList.scrollTop = Math.min(
-                    trackList.scrollTop + (newButtonRect.bottom - containerRect.bottom + 10),
-                    maxScroll
-                );
-                compositionArea.scrollTop = trackList.scrollTop;
-            }
-        }, 50);
         
         // 显示整合的解锁提示（包括效率和耐心提升）
         showUnlockMessage(actionId, efficiencyIncreased, newEfficiency, patienceIncreased, newPatience);
@@ -1136,38 +1071,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 显示欲望消费提示信息（放在顶部状态栏）
+    // 显示欲望消费提示信息（放在欲望进度条下方）
     function showDesireConsumptionMessage(amount) {
+        // 先删除可能存在的旧消息
+        const oldMessages = document.querySelectorAll('.desire-consumption-message');
+        oldMessages.forEach(msg => {
+            if (msg.parentNode) {
+                msg.parentNode.removeChild(msg);
+            }
+        });
+        
+        // 获取欲望进度条的位置
+        const desireStat = document.querySelector('.desire-stat');
+        if (!desireStat) {
+            console.warn('找不到欲望进度条元素');
+            return;
+        }
+        
+        // 获取主要属性行容器
+        const primaryStats = document.querySelector('.primary-stats');
+        if (!primaryStats) {
+            console.warn('找不到主要属性行容器');
+            return;
+        }
+        
+        // 创建消息元素
         const message = document.createElement('div');
         message.className = 'desire-consumption-message';
         message.innerHTML = `欲望消费了${amount}金钱`;
-        message.style.position = 'fixed';
-        message.style.top = '0';
-        message.style.left = '50%';
-        message.style.transform = 'translateX(-50%)';
-        message.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
-        message.style.color = 'white';
-        message.style.padding = '8px 15px';
-        message.style.borderRadius = '0 0 5px 5px';
-        message.style.fontWeight = 'bold';
-        message.style.zIndex = '999';
-        message.style.opacity = '0';
-        message.style.transition = 'opacity 0.5s ease';
         
+        // 设置样式为明显可见的文本
+        message.style.display = 'inline-block';
+        message.style.color = '#ff5252';
+        message.style.backgroundColor = 'rgba(255, 82, 82, 0.1)';
+        message.style.border = '1px solid #ff5252';
+        message.style.borderRadius = '3px';
+        message.style.fontSize = '12px';
+        message.style.fontWeight = 'bold';
+        message.style.padding = '2px 5px';
+        message.style.marginTop = '4px';
+        message.style.marginLeft = '8px';
+        message.style.position = 'absolute';
+        message.style.zIndex = '100';
+        
+        // 添加到主要属性行下方
         document.body.appendChild(message);
         
-        // 显示消息
-        setTimeout(() => {
-            message.style.opacity = '1';
-        }, 10);
+        // 计算位置：欲望属性下方
+        const desireRect = desireStat.getBoundingClientRect();
+        message.style.top = `${desireRect.bottom + 5}px`;
+        message.style.left = `${desireRect.left}px`;
         
         // 3秒后移除消息
         setTimeout(() => {
-            message.style.opacity = '0';
-            setTimeout(() => {
-                document.body.removeChild(message);
-            }, 500);
-        }, 2000);
+            if (message.parentNode) {
+                message.parentNode.removeChild(message);
+            }
+        }, 3000);
     }
     
     // 显示游戏结束信息
@@ -1338,6 +1298,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 显示炒股结果消息
     function showStockResultMessage(amount, isProfit) {
+        // 先删除可能存在的旧消息
+        const oldMessages = document.querySelectorAll('.stock-result-message');
+        oldMessages.forEach(msg => {
+            if (msg.parentNode) {
+                msg.parentNode.removeChild(msg);
+            }
+        });
+        
         const message = document.createElement('div');
         message.className = 'stock-result-message';
         
@@ -1349,18 +1317,22 @@ document.addEventListener('DOMContentLoaded', () => {
             message.style.backgroundColor = 'rgba(244, 67, 54, 0.9)'; // 红色背景表示亏损
         }
         
+        // 设置位置在屏幕中央偏上方，比解锁消息更高
         message.style.position = 'fixed';
-        message.style.top = '0';
+        message.style.top = '30%'; // 设为30%，比解锁消息(50%)更靠上
         message.style.left = '50%';
-        message.style.transform = 'translateX(-50%)';
+        message.style.transform = 'translate(-50%, -50%)';
+        
+        // 样式设置
         message.style.color = 'white';
-        message.style.padding = '8px 15px';
-        message.style.borderRadius = '0 0 5px 5px';
+        message.style.padding = '10px 20px';
+        message.style.borderRadius = '5px';
         message.style.fontWeight = 'bold';
-        message.style.zIndex = '999';
+        message.style.zIndex = '998'; // 设置为998，比解锁消息(999)低一级
         message.style.opacity = '0';
         message.style.transition = 'opacity 0.5s ease';
-        message.style.animation = 'slide-down 0.3s ease forwards';
+        message.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+        message.style.textAlign = 'center';
         
         document.body.appendChild(message);
         
@@ -1373,7 +1345,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             message.style.opacity = '0';
             setTimeout(() => {
-                document.body.removeChild(message);
+                if (message.parentNode) {
+                    message.parentNode.removeChild(message);
+                }
             }, 500);
         }, 2000);
     }
@@ -1437,16 +1411,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     startPlayback();
                 }
-                // 播放状态变化后确保滚动同步
-                setTimeout(resyncScroll, 100);
+                // 不再需要同步滚动
             });
         }
         
         if (resetButton) {
             resetButton.addEventListener('click', () => {
                 resetPlayCount();
-                // 重置游戏后确保滚动同步
-                setTimeout(resyncScroll, 100);
+                // 不再需要同步滚动
             });
         }
     }
@@ -1456,17 +1428,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 重构顶部布局
         restructureHeader();
         
-        // 再次检查DOM元素是否都获取成功
-        if (!getDOMElements()) {
-            return; // 中止初始化
-        }
+        // 获取初始DOM元素
+        getDOMElements();
         
-        // 初始化界面元素
-        initTrackButtons();
+        // 初始化网格 - 这会重新创建和引用addTrackButton
         initGrid();
+        
+        // 初始化其他界面元素
+        initTrackButtons();
         initPresetNotes(); // 设置预设的音符模式
         initAudio();
-        syncScroll();
         
         // 更新属性显示
         updateStatsDisplay();
@@ -1477,19 +1448,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新解锁按钮状态
         updateUnlockButtonState();
         
-        // 移除点击事件，解锁将自动进行
-        if (addTrackButton) {
-            addTrackButton.disabled = true;
-        }
-        
-        // 监听窗口大小变化，重新同步滚动
+        // 监听窗口大小变化
         window.addEventListener('resize', () => {
-            setTimeout(resyncScroll, 100); // 等待DOM更新后同步
+            // 不再需要同步滚动
         });
         
         // 监听设备方向变化（移动设备）
         window.addEventListener('orientationchange', () => {
-            setTimeout(resyncScroll, 200); // 方向变化后需要更长时间等待
+            // 不再需要同步滚动
         });
         
         // 防止iOS上的音频问题
@@ -1614,6 +1580,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新播放按钮图标为暂停图标
         playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
         
+        // 重置播放头位置到第一个节拍的左侧
+        playhead.style.left = '90px';
+        
         // 开始动画
         animatePlayhead();
         
@@ -1631,8 +1600,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新播放按钮图标为播放图标
         playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
         
-        // 重置播放头位置
-        playhead.style.left = '0';
+        // 重置播放头位置到第一个节拍的左侧
+        playhead.style.left = '90px';
         
         // 重置最后触发的列
         lastTriggeredColumn = -1;
