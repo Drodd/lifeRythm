@@ -57,48 +57,94 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 获取DOM元素函数，在初始化和restructureHeader后调用
     function getDOMElements() {
-        trackList = null; // 不再使用轨道列表
-        gridContainer = document.getElementById('gridContainer');
-        playButton = document.getElementById('playButton');
-        resetButton = document.getElementById('resetButton');
-        playCount = document.getElementById('playCount');
-        playLimit = document.getElementById('playLimit');
-        playhead = document.querySelector('.playhead');
-        statsContainer = document.getElementById('statsContainer');
-        compositionArea = document.querySelector('.combined-area');
-        
-        // 检查是否所有必要的元素都被找到
-        if (!gridContainer || !playButton || !resetButton || 
-            !playCount || !playLimit || !playhead || 
-            !statsContainer || !compositionArea) {
-            console.error('DOM元素获取失败，页面可能无法正常初始化');
-            console.log('缺失元素: ', 
-                !gridContainer ? 'gridContainer ' : '',
-                !playButton ? 'playButton ' : '',
-                !resetButton ? 'resetButton ' : '',
-                !playCount ? 'playCount ' : '',
-                !playLimit ? 'playLimit ' : '',
-                !playhead ? 'playhead ' : '',
-                !statsContainer ? 'statsContainer ' : '',
-                !compositionArea ? 'compositionArea ' : ''
-            );
+        try {
+            // 尝试获取所有必要的DOM元素
+            trackList = null; // 不再使用轨道列表
+            gridContainer = document.getElementById('gridContainer');
+            playButton = document.getElementById('playButton');
+            resetButton = document.getElementById('resetButton');
+            playCount = document.getElementById('playCount');
+            playLimit = document.getElementById('playLimit');
+            playhead = document.querySelector('.playhead');
+            statsContainer = document.getElementById('statsContainer');
+            compositionArea = document.querySelector('.combined-area');
             
-            // 显示错误信息给用户
-            const errorMessage = document.createElement('div');
-            errorMessage.style.position = 'fixed';
-            errorMessage.style.top = '50%';
-            errorMessage.style.left = '50%';
-            errorMessage.style.transform = 'translate(-50%, -50%)';
-            errorMessage.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
-            errorMessage.style.color = 'white';
-            errorMessage.style.padding = '20px';
-            errorMessage.style.borderRadius = '10px';
-            errorMessage.style.zIndex = '9999';
-            errorMessage.textContent = '页面加载错误，请刷新页面重试';
-            document.body.appendChild(errorMessage);
-            return false; // 获取元素失败
+            // 记录找到的每个元素，用于调试
+            console.log('获取DOM元素状态:', {
+                gridContainer: !!gridContainer,
+                playButton: !!playButton,
+                resetButton: !!resetButton,
+                playCount: !!playCount,
+                playLimit: !!playLimit,
+                playhead: !!playhead,
+                statsContainer: !!statsContainer,
+                compositionArea: !!compositionArea
+            });
+            
+            // 检查是否所有必要的元素都被找到
+            if (!gridContainer || !playButton || !resetButton || 
+                !playCount || !playLimit || !playhead || 
+                !statsContainer || !compositionArea) {
+                
+                const missingElements = [
+                    !gridContainer ? 'gridContainer ' : '',
+                    !playButton ? 'playButton ' : '',
+                    !resetButton ? 'resetButton ' : '',
+                    !playCount ? 'playCount ' : '',
+                    !playLimit ? 'playLimit ' : '',
+                    !playhead ? 'playhead ' : '',
+                    !statsContainer ? 'statsContainer ' : '',
+                    !compositionArea ? 'compositionArea ' : ''
+                ].filter(el => el !== '').join(', ');
+                
+                console.error('DOM元素获取失败，页面可能无法正常初始化');
+                console.error('缺失元素: ' + missingElements);
+                
+                if (window.debugLog) {
+                    window.debugLog('DOM元素获取失败: ' + missingElements);
+                }
+                
+                // 显示错误信息给用户
+                const errorMessage = document.createElement('div');
+                errorMessage.style.position = 'fixed';
+                errorMessage.style.top = '50%';
+                errorMessage.style.left = '50%';
+                errorMessage.style.transform = 'translate(-50%, -50%)';
+                errorMessage.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
+                errorMessage.style.color = 'white';
+                errorMessage.style.padding = '20px';
+                errorMessage.style.borderRadius = '10px';
+                errorMessage.style.zIndex = '9999';
+                errorMessage.style.textAlign = 'center';
+                errorMessage.innerHTML = `
+                    <div style="font-weight:bold;margin-bottom:10px;">页面加载错误</div>
+                    <div>无法获取必要的DOM元素：${missingElements}</div>
+                    <div style="margin-top:15px;">请刷新页面重试</div>
+                    <button id="reloadButton" style="margin-top:10px;padding:5px 15px;background:#fff;color:#f44336;border:none;border-radius:5px;cursor:pointer;">刷新页面</button>
+                `;
+                document.body.appendChild(errorMessage);
+                
+                // 添加刷新按钮事件
+                document.getElementById('reloadButton').addEventListener('click', () => {
+                    window.location.reload();
+                });
+                
+                return false; // 获取元素失败
+            }
+            
+            // 如果使用调试工具，记录元素获取成功
+            if (window.debugLog) {
+                window.debugLog('所有DOM元素获取成功');
+            }
+            
+            return true; // 获取元素成功
+        } catch (error) {
+            console.error('获取DOM元素时发生错误:', error);
+            if (window.debugLog) {
+                window.debugLog('获取DOM元素错误: ' + error.message);
+            }
+            return false;
         }
-        return true; // 获取元素成功
     }
     
     // 先尝试获取DOM元素
@@ -198,78 +244,109 @@ document.addEventListener('DOMContentLoaded', () => {
         // 清空现有统计信息
         statsContainer.innerHTML = '';
         
-        // 创建属性行容器
-        const statsRows = document.createElement('div');
-        statsRows.className = 'stats-rows';
+        // 创建属性列表容器
+        const statsList = document.createElement('div');
+        statsList.className = 'stats-list';
         
-        // 创建一级属性行（金钱、见闻、欲望）
-        const primaryStats = document.createElement('div');
-        primaryStats.className = 'primary-stats';
+        // 创建三大属性的音量条样式
+        const attributeColors = {
+            '金钱': {
+                background: '#ffd700', // 金色背景
+                color: '#000',         // 黑色文字
+                barClass: 'money-bar',
+                icon: '💰'             // 金钱图标
+            },
+            '见闻': {
+                background: '#4caf50', // 绿色背景
+                color: '#fff',         // 白色文字
+                barClass: 'knowledge-bar',
+                icon: '📚'             // 见闻图标
+            },
+            '欲望': {
+                background: '#ff5252', // 红色背景
+                color: '#fff',         // 白色文字
+                barClass: 'desire-bar',
+                icon: '🔥'             // 欲望图标
+            }
+        };
         
-        // 创建二级属性行（见闻、效率、耐心）
-        const secondaryStats = document.createElement('div');
-        secondaryStats.className = 'secondary-stats';
+        // 添加三大主要属性的音量条
+        ['金钱', '见闻', '欲望'].forEach(attr => {
+            const statRow = document.createElement('div');
+            statRow.className = 'stat-row';
+            
+            // 属性名称容器
+            const statName = document.createElement('div');
+            statName.className = 'stat-title';
+            
+            // 添加图标
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'stat-icon';
+            iconSpan.textContent = attributeColors[attr].icon;
+            statName.appendChild(iconSpan);
+            
+            // 添加属性名称
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = attr;
+            statName.appendChild(nameSpan);
+            
+            statName.style.color = attributeColors[attr].color;
+            statName.style.backgroundColor = attributeColors[attr].background;
+            statRow.appendChild(statName);
+            
+            // 音量条容器
+            const barContainer = document.createElement('div');
+            barContainer.className = `volume-bar-container ${attributeColors[attr].barClass}`;
+            
+            // 音量条本身
+            const bar = document.createElement('div');
+            bar.className = `volume-bar`;
+            bar.style.backgroundColor = attributeColors[attr].background;
+            
+            // 根据数值设置宽度比例 - 调整计算方式
+            let maxValue, percentage;
+            
+            if (attr === '欲望') {
+                // 欲望上限为金钱值
+                maxValue = Math.max(1, playerStats.金钱);
+                percentage = Math.min(100, (playerStats[attr] / maxValue) * 100);
+            } else {
+                // 金钱和见闻使用更适合游戏进度的动态比例
+                // 使用对数比例使得即使很大的值也能显示得更好
+                let baseValue = 100; // 基础参考值
+                percentage = Math.min(100, 100 * Math.log(1 + playerStats[attr] / 10) / Math.log(11)); // 对数比例
+            }
+            
+            bar.style.width = `${percentage}%`;
+            
+            // 添加值变化动画的处理
+            const oldValue = bar.getAttribute('data-old-value');
+            const newValue = playerStats[attr];
+            if (oldValue && oldValue != newValue) {
+                // 添加动画类
+                bar.classList.add('volume-bar-animate');
+                
+                // 一段时间后移除动画类
+                setTimeout(() => {
+                    bar.classList.remove('volume-bar-animate');
+                }, 1000);
+            }
+            // 存储当前值，以便下次比较
+            bar.setAttribute('data-old-value', newValue);
+            
+            barContainer.appendChild(bar);
+            statRow.appendChild(barContainer);
+            
+            // 数值显示
+            const statValue = document.createElement('div');
+            statValue.className = 'stat-value';
+            statValue.textContent = playerStats[attr];
+            statRow.appendChild(statValue);
+            
+            statsList.appendChild(statRow);
+        });
         
-        // 添加一级属性 - 金钱（突出显示）
-        const moneyItem = document.createElement('div');
-        moneyItem.className = 'primary-stat money-stat highlighted-stat';
-        moneyItem.innerHTML = `<span class="stat-icon">💰</span><span class="stat-name">金钱</span><span class="stat-value">${playerStats.金钱}</span>`;
-        primaryStats.appendChild(moneyItem);
-        
-        // 添加一级属性 - 见闻（突出显示）
-        const knowledgeItem = document.createElement('div');
-        knowledgeItem.className = 'primary-stat knowledge-stat highlighted-stat';
-        knowledgeItem.innerHTML = `<span class="stat-icon">📚</span><span class="stat-name">见闻</span><span class="stat-value">${playerStats.见闻}</span>`;
-        primaryStats.appendChild(knowledgeItem);
-        
-        // 欲望属性（使用进度条）
-        const desireItem = document.createElement('div');
-        desireItem.className = 'primary-stat desire-stat';
-        desireItem.title = '每天结束时，欲望值会消耗等量的金钱';
-        
-        // 创建进度条容器
-        const progressContainer = document.createElement('div');
-        progressContainer.className = 'progress-container';
-        
-        // 创建进度条
-        const progressBar = document.createElement('progress');
-        // 设置进度条最大值为当前金钱值（如果金钱为0则设为1以避免显示问题）
-        const maxValue = Math.max(1, playerStats.金钱);
-        progressBar.max = maxValue;
-        progressBar.value = Math.min(playerStats.欲望, maxValue); // 确保不超过最大值
-        
-        // 创建进度条文本
-        const progressText = document.createElement('span');
-        progressText.className = 'progress-text';
-        progressText.textContent = playerStats.欲望;
-        
-        // 组装进度条元素
-        progressContainer.appendChild(progressBar);
-        progressContainer.appendChild(progressText);
-        
-        // 设置标签和进度条
-        desireItem.innerHTML = `<span class="stat-icon">🔥</span><span class="stat-name">欲望</span>`;
-        desireItem.appendChild(progressContainer);
-        primaryStats.appendChild(desireItem);
-        
-        // 添加二级属性 - 效率
-        const efficiencyItem = document.createElement('div');
-        efficiencyItem.className = 'secondary-stat';
-        efficiencyItem.title = '效率决定了每个节拍可激活的最大行动数量';
-        efficiencyItem.innerHTML = `效率: <span>${playerStats.效率}</span>`;
-        secondaryStats.appendChild(efficiencyItem);
-        
-        // 添加二级属性 - 耐心
-        const patienceItem = document.createElement('div');
-        patienceItem.className = 'secondary-stat';
-        patienceItem.title = '耐心决定了一个行动可以连续激活的最大数量';
-        patienceItem.innerHTML = `耐心: <span>${playerStats.耐心}</span>`;
-        secondaryStats.appendChild(patienceItem);
-        
-        // 组装属性容器
-        statsRows.appendChild(primaryStats);
-        statsRows.appendChild(secondaryStats);
-        statsContainer.appendChild(statsRows);
+        statsContainer.appendChild(statsList);
     }
     
     // 初始化统计显示
@@ -663,7 +740,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 // 触发对应属性的闪烁警告效果
                                 flashWarning(stat);
                             } else {
-                                playerStats[stat] += value;
+                                // 使用新函数更新玩家属性并触发动画
+                                updatePlayerStat(stat, playerStats[stat] + value);
                             }
                         }
                     });
@@ -675,8 +753,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const randomPercent = (Math.random() * 20 - 10) / 100;
                     // 计算金钱变化值（四舍五入到整数）
                     const moneyChange = Math.round(playerStats.金钱 * randomPercent);
-                    // 应用变化
-                    playerStats.金钱 += moneyChange;
+                    // 应用变化（使用新函数）
+                    updatePlayerStat('金钱', playerStats.金钱 + moneyChange);
                     
                     // 显示炒股结果提示
                     if (moneyChange > 0) {
@@ -685,9 +763,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         showStockResultMessage(Math.abs(moneyChange), false); // 亏损
                     }
                 }
-                
-                // 更新属性显示
-                updateStatsDisplay();
                 
                 // 更新解锁按钮状态 - 检查是否可以解锁新行动
                 updateUnlockButtonState();
@@ -768,19 +843,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 每天结算：扣除等同于欲望值的金钱
                 if (playerStats.欲望 > 0) {
-                    playerStats.金钱 -= playerStats.欲望;
+                    // 使用新函数更新金钱值并触发动画
+                    updatePlayerStat('金钱', playerStats.金钱 - playerStats.欲望);
                     
                     // 显示欲望消费提示
                     showDesireConsumptionMessage(playerStats.欲望);
                     
-                    // 消费后将欲望清零
+                    // 消费后将欲望清零（使用新函数）
                     const consumedDesire = playerStats.欲望;
-                    playerStats.欲望 = 0;
+                    updatePlayerStat('欲望', 0);
                     
                     // 检查金钱是否小于等于0
                     if (playerStats.金钱 <= 0) {
                         playerStats.金钱 = 0; // 确保金钱不会显示为负数
-                        updateStatsDisplay();
+                        updateStatsDisplay(); // 这里需要再次更新显示
                         stopPlayback();
                         showGameOverMessage("你破产了！欲望消耗了你所有的财富。");
                         return;
@@ -852,18 +928,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 重置玩家属性
         Object.keys(playerStats).forEach(stat => {
+            let newValue;
             // 效率重置为1，耐心重置为3，其他重置为0
             if (stat === '效率') {
-                playerStats[stat] = 1;
+                newValue = 1;
             } else if (stat === '耐心') {
-                playerStats[stat] = 3;
+                newValue = 3;
             } else {
-                playerStats[stat] = 0;
+                newValue = 0;
             }
+            
+            // 使用新函数更新属性值
+            updatePlayerStat(stat, newValue);
         });
-        
-        // 更新属性显示
-        updateStatsDisplay();
         
         // 清空所有音符
         Object.keys(noteData).forEach(action => {
@@ -1354,116 +1431,207 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 重构顶部布局
     function restructureHeader() {
-        const header = document.querySelector('.header');
-        
-        // 清空现有内容
-        header.innerHTML = '';
-        
-        // 创建顶部行
-        const headerTopRow = document.createElement('div');
-        headerTopRow.className = 'header-top-row';
-        
-        // 创建左侧控制区（天数、重置和播放按钮）
-        const leftControls = document.createElement('div');
-        leftControls.className = 'left-controls';
-        
-        // 天数计数器
-        const counter = document.createElement('div');
-        counter.className = 'counter';
-        counter.innerHTML = `天数: <span id="playCount">0</span>/<span id="playLimit">${PLAY_LIMIT}</span>`;
-        leftControls.appendChild(counter);
-        
-        // 重置按钮
-        const resetBtn = document.createElement('button');
-        resetBtn.id = 'resetButton';
-        resetBtn.className = 'control-button';
-        resetBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 10h7V3l-2.35 3.35z"/></svg>';
-        leftControls.appendChild(resetBtn);
-        
-        // 播放按钮
-        const playBtn = document.createElement('button');
-        playBtn.id = 'playButton';
-        playBtn.className = 'control-button';
-        playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
-        leftControls.appendChild(playBtn);
-        
-        // 添加到顶部行
-        headerTopRow.appendChild(leftControls);
-        
-        // 添加统计容器
-        const statsDiv = document.createElement('div');
-        statsDiv.id = 'statsContainer';
-        
-        // 添加到顶部行
-        headerTopRow.appendChild(statsDiv);
-        
-        // 添加顶部行到header
-        header.appendChild(headerTopRow);
-        
-        // 重新获取DOM引用，而不是重新分配const变量
-        getDOMElements();
-        
-        // 重新绑定事件监听器
-        if (playButton) {
-            playButton.addEventListener('click', () => {
-                if (isPlaying) {
-                    stopPlayback();
-                } else {
-                    startPlayback();
-                }
-                // 不再需要同步滚动
-            });
-        }
-        
-        if (resetButton) {
-            resetButton.addEventListener('click', () => {
-                resetPlayCount();
-                // 不再需要同步滚动
-            });
+        try {
+            console.log('开始重构顶部布局');
+            const header = document.querySelector('.header');
+            
+            if (!header) {
+                console.error('无法找到header元素，中止重构');
+                window.debugLog && window.debugLog('重构失败：无法找到header元素');
+                return false;
+            }
+            
+            // 保存原始内容作为备份
+            const originalContent = header.innerHTML;
+            
+            try {
+                // 清空现有内容
+                header.innerHTML = '';
+                
+                // ======= 第一行：控制元素和二级属性 =======
+                const headerTopRow = document.createElement('div');
+                headerTopRow.className = 'header-top-row';
+                
+                // 左侧区域：天数、重置和播放按钮
+                const leftControls = document.createElement('div');
+                leftControls.className = 'left-controls';
+                
+                // 天数计数器
+                const counter = document.createElement('div');
+                counter.className = 'counter';
+                counter.innerHTML = `天数: <span id="playCount">0</span>/<span id="playLimit">${PLAY_LIMIT}</span>`;
+                leftControls.appendChild(counter);
+                
+                // 重置按钮
+                const resetBtn = document.createElement('button');
+                resetBtn.id = 'resetButton';
+                resetBtn.className = 'control-button';
+                resetBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 10h7V3l-2.35 3.35z"/></svg>';
+                leftControls.appendChild(resetBtn);
+                
+                // 播放按钮
+                const playBtn = document.createElement('button');
+                playBtn.id = 'playButton';
+                playBtn.className = 'control-button';
+                playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
+                leftControls.appendChild(playBtn);
+                
+                // 添加到顶部行
+                headerTopRow.appendChild(leftControls);
+                
+                // 右侧区域：效率、耐心属性
+                const rightControls = document.createElement('div');
+                rightControls.className = 'right-controls';
+                
+                // 效率属性
+                const efficiencyItem = document.createElement('div');
+                efficiencyItem.className = 'secondary-stat';
+                efficiencyItem.title = '效率决定了每个节拍可激活的最大行动数量';
+                efficiencyItem.innerHTML = `效率: <span>${playerStats.效率}</span>`;
+                rightControls.appendChild(efficiencyItem);
+                
+                // 耐心属性
+                const patienceItem = document.createElement('div');
+                patienceItem.className = 'secondary-stat';
+                patienceItem.title = '耐心决定了一个行动可以连续激活的最大数量';
+                patienceItem.innerHTML = `耐心: <span>${playerStats.耐心}</span>`;
+                rightControls.appendChild(patienceItem);
+                
+                // 添加到顶部行
+                headerTopRow.appendChild(rightControls);
+                
+                // 添加第一行到header
+                header.appendChild(headerTopRow);
+                
+                // ======= 第二行：主要属性（金钱、见闻、欲望）=======
+                const headerBottomRow = document.createElement('div');
+                headerBottomRow.className = 'header-bottom-row';
+                
+                // 主属性容器
+                const statsDiv = document.createElement('div');
+                statsDiv.id = 'statsContainer';
+                statsDiv.className = 'main-stats-container';
+                
+                // 添加到底部行
+                headerBottomRow.appendChild(statsDiv);
+                
+                // 添加第二行到header
+                header.appendChild(headerBottomRow);
+            } catch (innerError) {
+                console.error('重构顶部布局内部错误，恢复原始内容:', innerError);
+                // 恢复原始内容
+                header.innerHTML = originalContent;
+                window.debugLog && window.debugLog('重构内部错误: ' + innerError.message);
+                return false;
+            }
+            
+            console.log('顶部布局重构完成');
+            
+            // 验证元素是否都被正确创建
+            const criticalElements = [
+                document.getElementById('playButton'),
+                document.getElementById('resetButton'),
+                document.getElementById('playCount'),
+                document.getElementById('playLimit'),
+                document.getElementById('statsContainer')
+            ];
+            
+            if (criticalElements.some(el => !el)) {
+                console.error('重要元素创建失败，恢复原始内容');
+                header.innerHTML = originalContent;
+                window.debugLog && window.debugLog('重构失败：某些元素无法创建');
+                return false;
+            }
+            
+            // 重新绑定事件监听器
+            const newPlayButton = document.getElementById('playButton');
+            const newResetButton = document.getElementById('resetButton');
+            
+            if (newPlayButton) {
+                newPlayButton.addEventListener('click', () => {
+                    if (isPlaying) {
+                        stopPlayback();
+                    } else {
+                        startPlayback();
+                    }
+                });
+                console.log('播放按钮事件绑定成功');
+            } else {
+                console.error('无法找到播放按钮');
+                return false;
+            }
+            
+            if (newResetButton) {
+                newResetButton.addEventListener('click', () => {
+                    resetPlayCount();
+                });
+                console.log('重置按钮事件绑定成功');
+            } else {
+                console.error('无法找到重置按钮');
+                return false;
+            }
+            
+            return true; // 重构成功
+        } catch (error) {
+            console.error('重构顶部布局时发生错误:', error);
+            if (window.debugLog) {
+                window.debugLog('重构顶部布局错误: ' + error.message);
+            }
+            return false;
         }
     }
     
     // 初始化
     function initialize() {
-        // 重构顶部布局
-        restructureHeader();
-        
-        // 获取初始DOM元素
-        getDOMElements();
-        
-        // 初始化网格 - 这会重新创建和引用addTrackButton
-        initGrid();
-        
-        // 初始化其他界面元素
-        initTrackButtons();
-        initPresetNotes(); // 设置预设的音符模式
-        initAudio();
-        
-        // 更新属性显示
-        updateStatsDisplay();
-        
-        // 确保所有行动按钮的样式正确更新
-        updateAllActionButtonStyles();
-        
-        // 更新解锁按钮状态
-        updateUnlockButtonState();
-        
-        // 监听窗口大小变化
-        window.addEventListener('resize', () => {
-            // 不再需要同步滚动
-        });
-        
-        // 监听设备方向变化（移动设备）
-        window.addEventListener('orientationchange', () => {
-            // 不再需要同步滚动
-        });
-        
-        // 防止iOS上的音频问题
-        document.addEventListener('touchstart', () => {
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-        });
+        try {
+            // 初始化已经在外部完成了顶部布局重构，这里不再重复调用
+            // restructureHeader();
+            
+            // 然后获取DOM元素引用 - 如果外部调用已经获取成功，这里就不需要再次获取
+            // if (!getDOMElements()) {
+            //    console.error("无法获取关键DOM元素，中止初始化");
+            //    return; // 如果无法获取DOM元素，则中止初始化
+            // }
+            
+            // 初始化网格 - 这会重新创建和引用addTrackButton
+            initGrid();
+            
+            // 初始化其他界面元素
+            initTrackButtons();
+            initPresetNotes(); // 设置预设的音符模式
+            initAudio();
+            
+            // 更新属性显示
+            updateStatsDisplay();
+            
+            // 确保所有行动按钮的样式正确更新
+            updateAllActionButtonStyles();
+            
+            // 更新解锁按钮状态
+            updateUnlockButtonState();
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', () => {
+                // 不再需要同步滚动
+            });
+            
+            // 监听设备方向变化（移动设备）
+            window.addEventListener('orientationchange', () => {
+                // 不再需要同步滚动
+            });
+            
+            // 防止iOS上的音频问题
+            document.addEventListener('touchstart', () => {
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            });
+            
+            console.log("游戏初始化完成");
+        } catch (error) {
+            console.error("初始化过程中发生错误:", error);
+            window.debugLog && window.debugLog(`初始化错误: ${error.message}`);
+        }
     }
     
     // 初始化预设音符
@@ -1612,11 +1780,156 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // 音量条动画函数 - 模拟调音器音量条随音乐节奏上下振动
+    function animateVolumeBar(attr) {
+        // 查找对应属性的音量条
+        const volumeBarContainer = document.querySelector(`.volume-bar-container.${attr}-bar`);
+        if (!volumeBarContainer) return;
+        
+        const volumeBar = volumeBarContainer.querySelector('.volume-bar');
+        if (!volumeBar) return;
+        
+        // 存储原始宽度
+        const originalWidth = volumeBar.style.width;
+        const originalPercentage = parseFloat(originalWidth);
+        
+        // 创建一个随机振动效果
+        let animationCount = 0;
+        const maxAnimations = 6; // 增加振动次数
+        const baseDelay = 80; // 基础延迟时间（毫秒）
+        
+        const animate = () => {
+            if (animationCount >= maxAnimations) {
+                // 动画结束，恢复原始宽度
+                volumeBar.style.width = originalWidth;
+                return;
+            }
+            
+            // 生成随机宽度变化 (原始宽度基础上随机变化25%-50%)
+            let randomOffset;
+            if (animationCount % 2 === 0) {
+                // 偶数次增加宽度
+                randomOffset = originalPercentage * (Math.random() * 0.25 + 0.25);
+                volumeBar.style.width = `${Math.min(100, originalPercentage + randomOffset)}%`;
+            } else {
+                // 奇数次减少宽度
+                randomOffset = originalPercentage * (Math.random() * 0.15 + 0.10);
+                volumeBar.style.width = `${Math.max(10, originalPercentage - randomOffset)}%`;
+            }
+            
+            // 添加动画类
+            volumeBar.classList.add('volume-bar-animate');
+            
+            // 短暂延迟后移除动画类
+            setTimeout(() => {
+                volumeBar.classList.remove('volume-bar-animate');
+                animationCount++;
+                
+                // 根据动画计数动态调整延迟时间，创造渐渐平息的效果
+                const dynamicDelay = baseDelay + (animationCount * 40);
+                
+                // 继续下一次动画
+                setTimeout(animate, dynamicDelay);
+            }, 200);
+        };
+        
+        // 开始动画
+        animate();
+    }
+    
+    // 更新玩家属性值并触发音量条动画
+    function updatePlayerStat(stat, value) {
+        // 获取旧值
+        const oldValue = playerStats[stat];
+        
+        // 如果值没有变化，直接返回
+        if (oldValue === value) {
+            return;
+        }
+        
+        // 更新值
+        playerStats[stat] = value;
+        
+        // 更新显示
+        updateStatsDisplay();
+        
+        // 只有主要属性（金钱、见闻、欲望）变化时才触发动画
+        if (['金钱', '见闻', '欲望'].includes(stat)) {
+            // 确定对应的bar类名
+            let barClass;
+            switch(stat) {
+                case '金钱': barClass = 'money'; break;
+                case '见闻': barClass = 'knowledge'; break;
+                case '欲望': barClass = 'desire'; break;
+                default: return; // 其他属性不触发动画
+            }
+            
+            // 触发音量条动画
+            animateVolumeBar(barClass);
+            
+            // 在控制台记录值的变化，便于调试
+            console.log(`属性 ${stat} 从 ${oldValue} 变为 ${value}`);
+        }
+    }
+    
     // 在文档底部调用初始化函数
     try {
-        // 初始化
-        initialize();
-        console.log('游戏初始化完成');
+        console.log('开始游戏初始化...');
+        
+        // 直接调用重构顶部布局函数，确保最先执行
+        const headerRestructured = restructureHeader();
+        
+        // 使用setTimeout延迟执行，确保DOM元素已经完全渲染
+        setTimeout(() => {
+            console.log('延迟执行DOM元素获取...');
+            
+            // 获取DOM元素
+            if (!getDOMElements()) {
+                console.error('无法获取关键DOM元素，中止初始化');
+                window.debugLog && window.debugLog('DOM元素获取失败，可能需要刷新页面');
+                return;
+            }
+            
+            // 继续其他初始化
+            console.log('DOM元素获取成功，继续初始化...');
+            
+            // 初始化 - 如果上面的restructureHeader失败，就使用HTML中已有的元素，不再尝试重构
+            if (headerRestructured) {
+                console.log('使用重构后的顶部栏布局');
+                initialize();
+            } else {
+                console.log('使用HTML中的默认顶部栏布局');
+                // 跳过重构步骤，直接进行其他初始化
+                initGrid();
+                initTrackButtons();
+                initPresetNotes();
+                initAudio();
+                updateStatsDisplay();
+                updateAllActionButtonStyles();
+                updateUnlockButtonState();
+                
+                // 确保播放和重置按钮已绑定事件
+                const defaultPlayButton = document.getElementById('playButton');
+                const defaultResetButton = document.getElementById('resetButton');
+                
+                if (defaultPlayButton) {
+                    defaultPlayButton.addEventListener('click', () => {
+                        if (isPlaying) {
+                            stopPlayback();
+                        } else {
+                            startPlayback();
+                        }
+                    });
+                }
+                
+                if (defaultResetButton) {
+                    defaultResetButton.addEventListener('click', resetPlayCount);
+                }
+            }
+            
+            console.log('游戏初始化完成');
+        }, 100); // 添加短暂延迟，等待DOM渲染
+        
     } catch (error) {
         console.error('游戏初始化失败：', error);
         alert('游戏加载出错，请刷新页面重试');
