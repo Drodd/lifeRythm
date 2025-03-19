@@ -703,77 +703,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 播放动画
-    function startPlayback() {
-        if (isPlaying) return;
-        
-        const startPlayingAudio = async () => {
-            try {
-                // 初始化音频上下文（如果还未初始化）
-                if (!audioContext || !audioInitialized) {
-                    await initAudio();
-                }
-                
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-                
-                if (audioContext.state !== 'running') {
-                    console.warn('音频上下文状态不是running:', audioContext.state);
-                    setTimeout(startPlayingAudio, 100); // 尝试再次启动
-                    return;
-                }
-                
-                // 开始播放
-                startPlaybackAfterAudioInit();
-            } catch (error) {
-                console.error('启动播放错误:', error);
-                alert('播放失败，请重试');
-            }
-        };
-        
-        startPlayingAudio();
-    }
-    
-    // 在音频初始化后开始播放
-    function startPlaybackAfterAudioInit() {
-        isPlaying = true;
-        lastTriggeredColumn = -1;
-        startTime = audioContext.currentTime;
-        lastCycleTime = startTime; // 初始化上次循环计数时间
-        
-        // 更新播放按钮图标为暂停图标
-        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-        
-        // 开始动画
-        animatePlayhead();
-        
-        console.log('播放开始，ANIMATION_DURATION:', ANIMATION_DURATION);
-    }
-    
-    // 停止播放
-    function stopPlayback() {
-        isPlaying = false;
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
-        
-        // 更新播放按钮图标为播放图标
-        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
-        
-        // 重置播放头位置
-        playhead.style.left = '0';
-        
-        // 重置最后触发的列
-        lastTriggeredColumn = -1;
-        
-        // 清除所有当前列标记
-        document.querySelectorAll('.grid-cell.current').forEach(cell => {
-            cell.classList.remove('current');
-        });
-    }
-    
-    // 动画播放头
     function animatePlayhead() {
         if (!isPlaying) return;
         
@@ -795,33 +724,16 @@ document.addEventListener('DOMContentLoaded', () => {
             updateCurrentColumn(currentColumn);
             
             // 检查是否需要触发新列的音符
-            // 如果当前列与上一次触发的列不同，则触发新列的音符
+            // 如果当前列与上一次触发的列不同，或者到达循环的终点，则触发新列的音符
             if (currentColumn !== lastTriggeredColumn) {
-                // 检查是否跳过了列（在循环的末尾回到开始时除外）
-                if ((currentColumn !== 0 || lastTriggeredColumn !== GRID_COLUMNS - 1) && 
-                    lastTriggeredColumn !== -1 && 
-                    Math.abs(currentColumn - lastTriggeredColumn) > 1) {
-                    
-                    // 处理跳过的列
-                    const step = currentColumn > lastTriggeredColumn ? 1 : -1;
-                    let col = lastTriggeredColumn + step;
-                    
-                    // 触发所有被跳过的列
-                    while (col !== currentColumn) {
-                        triggerColumnNotes(col);
-                        col += step;
-                        
-                        // 处理循环边界
-                        if (col >= GRID_COLUMNS) col = 0;
-                        if (col < 0) col = GRID_COLUMNS - 1;
-                    }
-                }
+                // 使用 requestAnimationFrame 确保更新视觉和播放音效保持同步
+                window.requestAnimationFrame(() => {
+                    // 触发当前列的音符
+                    triggerColumnNotes(currentColumn);
                 
-                // 触发当前列的音符
-                triggerColumnNotes(currentColumn);
-                
-                // 更新最后触发的列
-                lastTriggeredColumn = currentColumn;
+                    // 更新最后触发的列
+                    lastTriggeredColumn = currentColumn;
+                });
             }
             
             // 检查是否完成一次循环（一天）
@@ -870,7 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // 继续动画
+        // 使用 requestAnimationFrame 确保更平滑的动画
         if (isPlaying) {
             animationId = requestAnimationFrame(animatePlayhead);
         }
@@ -878,10 +790,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 触发指定列的所有音符
     function triggerColumnNotes(column) {
-        addedActions.forEach(action => {
-            const actionId = action.id;
-            if (noteData[actionId] && noteData[actionId][column]) {
-                playSound(actionId, true); // 第二个参数为true表示更新属性
+        // 找到这一列所有激活的音符
+        const activeCells = document.querySelectorAll(`.grid-cell[data-column="${column}"].active`);
+        
+        // 触发每个激活的音符，立即更新属性和视觉效果
+        activeCells.forEach(cell => {
+            const actionId = cell.getAttribute('data-action');
+            if (actionId && noteData[actionId] && noteData[actionId][column]) {
+                // 触发声音和属性更新
+                playSound(actionId, true);
+                
+                // 添加一个视觉反馈效果
+                cell.style.animation = 'none';
+                setTimeout(() => {
+                    cell.style.animation = 'pulse 0.3s ease-in-out';
+                }, 10);
             }
         });
     }
@@ -1647,6 +1570,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         return effects.join(' ');
+    }
+    
+    // 播放动画
+    function startPlayback() {
+        if (isPlaying) return;
+        
+        const startPlayingAudio = async () => {
+            try {
+                // 初始化音频上下文（如果还未初始化）
+                if (!audioContext || !audioInitialized) {
+                    await initAudio();
+                }
+                
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                
+                if (audioContext.state !== 'running') {
+                    console.warn('音频上下文状态不是running:', audioContext.state);
+                    setTimeout(startPlayingAudio, 100); // 尝试再次启动
+                    return;
+                }
+                
+                // 开始播放
+                startPlaybackAfterAudioInit();
+            } catch (error) {
+                console.error('启动播放错误:', error);
+                alert('播放失败，请重试');
+            }
+        };
+        
+        startPlayingAudio();
+    }
+    
+    // 在音频初始化后开始播放
+    function startPlaybackAfterAudioInit() {
+        isPlaying = true;
+        lastTriggeredColumn = -1;
+        startTime = audioContext.currentTime;
+        lastCycleTime = startTime; // 初始化上次循环计数时间
+        
+        // 更新播放按钮图标为暂停图标
+        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+        
+        // 开始动画
+        animatePlayhead();
+        
+        console.log('播放开始，ANIMATION_DURATION:', ANIMATION_DURATION);
+    }
+    
+    // 停止播放
+    function stopPlayback() {
+        isPlaying = false;
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+        
+        // 更新播放按钮图标为播放图标
+        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
+        
+        // 重置播放头位置
+        playhead.style.left = '0';
+        
+        // 重置最后触发的列
+        lastTriggeredColumn = -1;
+        
+        // 清除所有当前列标记
+        document.querySelectorAll('.grid-cell.current').forEach(cell => {
+            cell.classList.remove('current');
+        });
     }
     
     // 在文档底部调用初始化函数
