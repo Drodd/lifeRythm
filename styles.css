@@ -1,0 +1,656 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 顶部样式 */
+.header {
+    background-color: #222;
+    color: white;
+    padding: 10px;
+    border-bottom: 1px solid #444;
+    z-index: 100;
+    flex-shrink: 0;
+}
+
+.header-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.left-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.counter {
+    font-size: 18px;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+.control-button {
+    background-color: #ff5722;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-button svg {
+    fill: white;
+}
+
+.control-button:hover {
+    background-color: #ff7043;
+    transform: scale(1.05);
+}
+
+#statsContainer {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* 状态显示样式 */
+.stats-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-left: auto;
+}
+
+.primary-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.secondary-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.primary-stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 3px 8px;
+    border-radius: 5px;
+}
+
+.money-stat {
+    color: #ffd700; /* 金色 */
+}
+
+.desire-stat {
+    color: #ff5252; /* 红色 */
+}
+
+.knowledge-stat {
+    color: #4caf50; /* 绿色 */
+}
+
+.secondary-stat {
+    padding: 2px 8px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+}
+
+.stat-icon {
+    font-size: 18px;
+}
+
+/* 进度条样式 */
+.progress-container {
+    display: flex;
+    align-items: center;
+    width: 100px;
+    gap: 5px;
+}
+
+.progress-container progress {
+    flex-grow: 1;
+    height: 15px;
+    border-radius: 5px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+}
+
+/* 自定义进度条颜色 */
+.progress-container progress::-webkit-progress-bar {
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+.progress-container progress::-webkit-progress-value {
+    background-color: #ff5252;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-container progress::-moz-progress-bar {
+    background-color: #ff5252;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    margin-left: 8px;
+    font-weight: bold;
+    color: #ff5252;
+    min-width: 20px;
+    text-align: right;
+}
+
+/* 主内容区域 */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    height: calc(100vh - 60px);
+}
+
+/* 轨道列表样式 */
+.track-list {
+    width: 220px;
+    min-width: 150px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: #333;
+    overflow-y: auto;
+    border-right: 1px solid #444;
+    flex-shrink: 0;
+    padding: 0; /* 确保没有内边距 */
+}
+
+.track-button {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 15px;
+    height: 70px;
+    min-height: 70px; /* 确保与网格单元格高度一致 */
+    background-color: #444;
+    border: none;
+    border-bottom: 1px solid #555;
+    color: white;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s;
+    position: relative;
+    box-sizing: border-box; /* 确保高度计算包括边框 */
+}
+
+.track-button:hover {
+    background-color: #555;
+}
+
+.track-button.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* 动作名称和图标容器 */
+.action-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.action-emoji {
+    font-size: 20px;
+    margin-right: 8px;
+}
+
+.action-name {
+    flex: 1;
+    font-weight: bold;
+}
+
+/* 行动按钮中的效果说明 */
+.action-effect {
+    display: flex;
+    gap: 5px;
+    font-size: 0.8rem;
+    color: #999;
+    font-weight: normal;
+    margin-left: 28px;
+    white-space: nowrap;
+}
+
+.effect-icon {
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.positive-effect {
+    background-color: rgba(76, 175, 80, 0.3);
+}
+
+.negative-effect {
+    background-color: rgba(244, 67, 54, 0.3);
+}
+
+/* 谱曲区域样式 */
+.composition-area {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    overflow-y: auto;
+    background-color: #444;
+    background-image: none;
+    padding: 0;
+}
+
+.playhead {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 2px;
+    background-color: #ff5722;
+    z-index: 5;
+    box-shadow: 0 0 5px rgba(255, 87, 34, 0.7);
+    pointer-events: none;
+}
+
+/* 网格容器样式 */
+#gridContainer {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+    border-collapse: collapse;
+}
+
+/* 网格单元格样式 */
+.grid-cell {
+    height: 70px;
+    min-height: 70px;
+    background-color: #555;
+    border-radius: 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s;
+    box-sizing: border-box;
+    margin: 0;
+    border: 1px solid #444;
+    position: relative;
+    outline: none;
+    padding: 0;
+}
+
+.grid-cell:hover {
+    background-color: #666;
+}
+
+.grid-cell.active {
+    background-color: #1e88e5;
+    box-shadow: none;
+    border: 1px solid #0d47a1;
+}
+
+.grid-cell.current {
+    background-color: rgba(255, 87, 34, 0.2);
+    border-color: rgba(255, 87, 34, 0.4);
+}
+
+.grid-cell.active.current {
+    background-color: #42a5f5;
+    border-color: #1565c0;
+}
+
+.action-emoji-cell {
+    font-size: 24px;
+    animation: pulse 2s infinite ease-in-out;
+    margin: 0;
+}
+
+/* 占位单元格 */
+.placeholder-cell {
+    background-color: #555;
+    opacity: 0.8;
+    height: 70px;
+    min-height: 70px;
+    border: 1px solid #444;
+}
+
+/* 动画 */
+@keyframes slide-down {
+    from {
+        transform: translateY(-100%) translateX(-50%);
+    }
+    to {
+        transform: translateY(0) translateX(-50%);
+    }
+}
+
+/* 媒体查询 - 适配横屏 */
+@media (max-width: 768px) and (orientation: landscape) {
+    .header {
+        padding: 5px;
+    }
+    
+    .track-list {
+        width: 150px;
+    }
+    
+    .track-button {
+        height: 60px;
+        min-height: 60px; /* 在横屏模式下与网格单元格高度保持一致 */
+        padding: 5px 10px;
+    }
+    
+    .action-emoji {
+        font-size: 16px;
+    }
+    
+    .action-effect {
+        font-size: 10px;
+        margin-left: 24px;
+    }
+    
+    .grid-cell, .placeholder-cell {
+        height: 60px;
+        min-height: 60px;
+        border-width: 1px; /* 确保横屏模式下边框宽度一致 */
+    }
+    
+    /* 确保横屏模式下的网格计算正确 */
+    #gridContainer {
+        gap: 0; /* 确保横屏模式下无间距 */
+        padding: 0;
+        margin: 0;
+    }
+}
+
+/* 调试样式 */
+.debug-outline {
+    outline: 1px solid red;
+}
+
+.debug-background {
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+/* 游戏结束模态框 */
+.game-over-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.game-over-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 80%;
+}
+
+.game-over-content h2 {
+    margin-top: 0;
+    color: #f44336;
+}
+
+.game-over-content p {
+    margin: 20px 0;
+    font-size: 1.2rem;
+}
+
+#restartButton {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+#restartButton:hover {
+    background-color: #d32f2f;
+}
+
+/* 解锁消息中的额外奖励信息 */
+.unlock-bonus {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.2);
+    display: inline-block;
+}
+
+/* 提示消息 */
+.unlock-message,
+.efficiency-limit-message,
+.patience-limit-message,
+.desire-consumption-message,
+.stock-result-message {
+    position: fixed;
+    z-index: 999;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* 精力值进度条样式 */
+.energy-bar-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 5px 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+    height: 32px;
+}
+
+.energy-bar-label {
+    margin-right: 10px;
+    font-weight: bold;
+    color: white;
+}
+
+.energy-bar-wrapper {
+    flex: 1;
+    height: 18px;
+    background-color: #444;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.energy-bar {
+    height: 100%;
+    width: 50%; /* 初始宽度，将通过JS动态调整 */
+    background: linear-gradient(90deg, #4CAF50, #FFEB3B, #F44336);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.energy-value {
+    margin-left: 10px;
+    font-weight: bold;
+    color: white;
+}
+
+/* 精力值在正常、警告和危险区间的颜色 */
+.energy-normal {
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+}
+
+.energy-warning-low {
+    background: linear-gradient(90deg, #FFC107, #FFEB3B);
+}
+
+.energy-warning-high {
+    background: linear-gradient(90deg, #FF9800, #FFEB3B);
+}
+
+.energy-danger-low {
+    background: linear-gradient(90deg, #F44336, #FF5722);
+}
+
+.energy-danger-high {
+    background: linear-gradient(90deg, #F44336, #9C27B0);
+}
+
+/* 闪烁警告动画 */
+@keyframes flash-warning {
+    0%, 100% { 
+        background-color: inherit;
+        color: inherit;
+    }
+    50% { 
+        background-color: rgba(244, 67, 54, 0.8); 
+        color: white;
+    }
+}
+
+/* 精力值闪烁警告样式 */
+.energy-flash-warning {
+    animation: flash-warning 0.5s ease-in-out 3;
+}
+
+/* 属性闪烁警告样式 */
+.stat-flash-warning {
+    animation: flash-warning 0.5s ease-in-out 3;
+}
+
+/* 行动按钮的精力影响颜色 */
+.energy-positive {
+    color: #4CAF50; /* 绿色 - 最终增加精力 */
+    font-weight: bold;
+}
+
+.energy-negative {
+    color: #F44336; /* 红色 - 最终减少精力 */
+    font-weight: bold;
+}
+
+.energy-neutral {
+    color: inherit; /* 默认颜色 - 精力不变 */
+}
+
+/* 效率限制高亮 */
+.efficiency-limit-highlight {
+    animation: efficiency-limit-flash 0.5s ease-in-out 3;
+}
+
+@keyframes efficiency-limit-flash {
+    0%, 100% { 
+        background-color: inherit;
+    }
+    50% { 
+        background-color: rgba(33, 150, 243, 0.5);
+    }
+}
+
+/* 效率提升和限制消息共有样式 */
+.efficiency-increase-message,
+.efficiency-limit-message {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    animation: message-pulse 1s infinite;
+}
+
+@keyframes message-pulse {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 耐心限制高亮 */
+.patience-limit-highlight {
+    background-color: rgba(255, 152, 0, 0.5) !important;
+    animation: patience-pulse 0.5s ease-in-out 3;
+}
+
+/* 耐心限制脉冲动画 */
+@keyframes patience-pulse {
+    0% { background-color: rgba(255, 152, 0, 0.5); }
+    50% { background-color: rgba(255, 152, 0, 0.8); }
+    100% { background-color: rgba(255, 152, 0, 0.5); }
+}
+
+/* 耐心限制消息样式 */
+.patience-limit-message, .patience-increase-message {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    animation: message-pulse 1s ease-in-out infinite;
+}
+
+/* 统计面板中耐心项目样式 */
+.stat-item.patience {
+    background-color: rgba(156, 39, 176, 0.2);
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+.stat-item.patience:hover::after {
+    content: "耐心决定一个行动可以连续激活的最大数量";
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 100;
+}
+
+/* 添加脉冲动画 */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+} 

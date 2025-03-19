@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>生活律动</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top-row">
+                <div class="left-controls">
+                    <div class="counter">天数: <span id="playCount">0</span>/<span id="playLimit">60</span></div>
+                    <button id="resetButton" class="control-button">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 10h7V3l-2.35 3.35z"/></svg>
+                    </button>
+                    <button id="playButton" class="control-button">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                </div>
+                <div id="statsContainer" class="debug-outline"></div>
+            </div>
+        </div>
+        <div class="main-content debug-outline">
+            <div class="track-list debug-outline">
+                <button id="addTrackButton" class="track-button" disabled>需要见闻值解锁</button>
+            </div>
+            <div class="composition-area debug-outline">
+                <div id="gridContainer" class="debug-outline"></div>
+                <div class="playhead"></div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+    <!-- 添加调试信息显示区域 -->
+    <div id="debug-info" style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px; font-size: 12px; z-index: 9999;"></div>
+    <script>
+        // 简单的调试工具
+        window.debugLog = function(msg) {
+            console.log(msg);
+            const debugDiv = document.getElementById('debug-info');
+            if (debugDiv) {
+                debugDiv.textContent = msg;
+                setTimeout(() => {
+                    debugDiv.textContent = '';
+                }, 5000);
+            }
+        };
+        
+        // 在DOM加载完成后检查关键元素
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkElements = ['statsContainer', 'gridContainer', 'trackList', 'composition-area'];
+            const missing = [];
+            
+            checkElements.forEach(id => {
+                const el = id.includes('-') ? document.querySelector(`.${id}`) : document.getElementById(id);
+                if (!el) missing.push(id);
+            });
+            
+            if (missing.length > 0) {
+                window.debugLog(`Missing elements: ${missing.join(', ')}`);
+            } else {
+                window.debugLog('All key elements found in DOM');
+            }
+        });
+    </script>
+</body>
+</html> 
