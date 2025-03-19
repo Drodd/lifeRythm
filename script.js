@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 常量定义
     const BPM = 280;
     const PLAY_LIMIT = 60;
-    const GRID_COLUMNS = 16;
+    const GRID_COLUMNS = 8;
     const BEAT_DURATION = 60 / BPM; // 一拍的持续时间（秒）- 修正为60/BPM
     const ANIMATION_DURATION = BEAT_DURATION * GRID_COLUMNS; // 总动画时间
     
@@ -292,8 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 noteData[actionId] = {};
             }
             
-            // 为每个动作创建16列
-            for (let col = 0; col < 16; col++) {
+            // 为每个动作创建8列
+            for (let col = 0; col < GRID_COLUMNS; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell';
                 cell.setAttribute('data-action', actionId);
@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // 添加一个额外的空白行作为"+"按钮的对应物，确保两边高度一致
-        for (let col = 0; col < 16; col++) {
+        for (let col = 0; col < GRID_COLUMNS; col++) {
             const placeholderCell = document.createElement('div');
             placeholderCell.className = 'grid-cell placeholder-cell';
             placeholderCell.setAttribute('data-column', col);
@@ -1502,8 +1502,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 初始化预设音符
     function initPresetNotes() {
-        // 工作行动音符 - 第5、6、7列，第9、10、11列，第13、14列
-        const workColumns = [4, 5, 6, 8, 9, 10, 12, 13];
+        // 工作行动音符 - 适应8列布局
+        const workColumns = [2, 3, 5, 6];
         workColumns.forEach(col => {
             noteData['工作'][col] = true;
             // 更新UI
@@ -1520,8 +1520,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // 吃饭行动音符 - 第4列，第8列，第12列
-        const eatColumns = [3, 7, 11];
+        // 吃饭行动音符 - 适应8列布局
+        const eatColumns = [1, 4, 7];
         eatColumns.forEach(col => {
             noteData['吃饭'][col] = true;
             // 更新UI
