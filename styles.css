@@ -25,40 +25,46 @@ body {
 
 /* 顶部样式 */
 .header {
-    background-color: #222;
-    color: white;
-    padding: 10px;
-    border-bottom: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    background-color: #fff;
+    border-bottom: 1px solid #ddd;
     z-index: 100;
     flex-shrink: 0;
+    height: 60px;
+    box-sizing: border-box;
 }
 
 .header-top-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-between; /* 分散对齐 */
     align-items: center;
+    margin-bottom: 5px;
 }
 
 .left-controls {
+    order: 2; /* 调整顺序，放到右边 */
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
 }
 
 .counter {
-    font-size: 18px;
+    font-size: 14px; /* 减小字体 */
     font-weight: bold;
     background: rgba(0, 0, 0, 0.3);
-    padding: 5px 10px;
-    border-radius: 15px;
+    padding: 3px 6px; /* 缩小内边距 */
+    border-radius: 12px;
+    white-space: nowrap; /* 防止文字换行 */
 }
 
 .control-button {
     background-color: #ff5722;
     border: none;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 32px; /* 缩小按钮 */
+    height: 32px; /* 缩小按钮 */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -68,6 +74,8 @@ body {
 
 .control-button svg {
     fill: white;
+    width: 20px; /* 缩小图标 */
+    height: 20px; /* 缩小图标 */
 }
 
 .control-button:hover {
@@ -76,39 +84,40 @@ body {
 }
 
 #statsContainer {
-    flex: 1;
+    order: 1; /* 调整顺序，放到左边 */
     display: flex;
-    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* 状态显示样式 */
 .stats-rows {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-left: auto;
+    gap: 4px; /* 减小间距 */
+    margin-left: 0; /* 取消右对齐 */
 }
 
 .primary-stats {
     display: flex;
-    gap: 15px;
+    gap: 8px; /* 减小间距 */
 }
 
 .secondary-stats {
     display: flex;
-    gap: 15px;
-    font-size: 14px;
+    gap: 8px; /* 减小间距 */
+    font-size: 12px; /* 减小字体 */
     color: #ccc;
 }
 
 .primary-stat {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 3px; /* 减小间距 */
     font-weight: bold;
     background: rgba(0, 0, 0, 0.2);
-    padding: 3px 8px;
-    border-radius: 5px;
+    padding: 2px 6px; /* 缩小内边距 */
+    border-radius: 4px;
+    font-size: 14px; /* 减小字体 */
 }
 
 .money-stat {
@@ -130,21 +139,21 @@ body {
 }
 
 .stat-icon {
-    font-size: 18px;
+    font-size: 16px; /* 减小图标 */
 }
 
 /* 进度条样式 */
 .progress-container {
     display: flex;
     align-items: center;
-    width: 100px;
-    gap: 5px;
+    width: 80px; /* 减小宽度 */
+    gap: 3px;
 }
 
 .progress-container progress {
     flex-grow: 1;
-    height: 15px;
-    border-radius: 5px;
+    height: 12px; /* 减小高度 */
+    border-radius: 4px;
     background-color: #f5f5f5;
     border: 1px solid #ddd;
 }
@@ -168,11 +177,12 @@ body {
 }
 
 .progress-text {
-    margin-left: 8px;
+    margin-left: 4px;
     font-weight: bold;
     color: #ff5252;
-    min-width: 20px;
+    min-width: 18px;
     text-align: right;
+    font-size: 13px; /* 减小字体 */
 }
 
 /* 主内容区域 */
@@ -186,33 +196,33 @@ body {
 
 /* 轨道列表样式 */
 .track-list {
-    width: 220px;
-    min-width: 150px;
+    width: 160px; /* 压缩宽度 */
+    min-width: 120px;
     height: 100%;
+    overflow-y: auto;
+    background-color: #f8f8f8;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    background-color: #333;
-    overflow-y: auto;
-    border-right: 1px solid #444;
-    flex-shrink: 0;
-    padding: 0; /* 确保没有内边距 */
+    gap: 0;
+    border-right: 1px solid #ddd;
+    padding-bottom: 2px;
 }
 
 .track-button {
+    padding: 8px 10px; /* 减小内边距 */
+    background-color: #fff;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    text-align: left;
+    cursor: pointer;
+    min-height: 60px;
+    height: 60px;
     display: flex;
     flex-direction: column;
-    padding: 10px 15px;
-    height: 70px;
-    min-height: 70px; /* 确保与网格单元格高度一致 */
-    background-color: #444;
-    border: none;
-    border-bottom: 1px solid #555;
-    color: white;
-    cursor: pointer;
-    text-align: left;
-    transition: background-color 0.2s;
-    position: relative;
-    box-sizing: border-box; /* 确保高度计算包括边框 */
+    justify-content: space-between;
+    transition: background-color 0.3s;
+    box-sizing: border-box;
 }
 
 .track-button:hover {
@@ -228,34 +238,44 @@ body {
 .action-header {
     display: flex;
     align-items: center;
-    margin-bottom: 6px;
+    width: 100%;
 }
 
 .action-emoji {
-    font-size: 20px;
-    margin-right: 8px;
+    font-size: 22px; /* 放大表情符号 */
+    margin-right: 5px;
+    min-width: 24px;
+    text-align: center;
 }
 
 .action-name {
-    flex: 1;
+    font-size: 16px; /* 放大行为名称 */
     font-weight: bold;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* 行动按钮中的效果说明 */
 .action-effect {
     display: flex;
-    gap: 5px;
-    font-size: 0.8rem;
-    color: #999;
-    font-weight: normal;
-    margin-left: 28px;
-    white-space: nowrap;
+    align-items: center;
+    gap: 4px; /* 减小图标间距 */
+    font-size: 12px;
+    color: #666;
+    margin-left: 0; /* 去掉左边缩进 */
 }
 
 .effect-icon {
-    font-size: 12px;
-    padding: 2px 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 2px 3px;
     border-radius: 3px;
+    font-size: 11px; /* 稍微减小图标字体 */
+    font-weight: bold;
+    color: white;
 }
 
 .positive-effect {
@@ -401,6 +421,89 @@ body {
         gap: 0; /* 确保横屏模式下无间距 */
         padding: 0;
         margin: 0;
+    }
+}
+
+/* 媒体查询 - 竖屏布局 */
+@media (max-width: 480px), (orientation: portrait) {
+    /* 顶栏竖屏样式 */
+    .header {
+        padding: 5px;
+    }
+    
+    .header-top-row {
+        margin-bottom: 2px;
+    }
+    
+    .left-controls {
+        gap: 3px;
+    }
+    
+    #statsContainer {
+        gap: 5px;
+    }
+    
+    .control-button {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .control-button svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .primary-stat {
+        padding: 2px 4px;
+        font-size: 12px;
+    }
+    
+    .stat-icon {
+        font-size: 14px;
+    }
+    
+    .secondary-stats {
+        font-size: 10px;
+    }
+    
+    /* 更加压缩左侧列表 */
+    .track-list {
+        width: 140px;
+    }
+    
+    .track-button {
+        padding: 6px 8px;
+        min-height: 58px;
+        height: 58px;
+    }
+    
+    .action-emoji {
+        font-size: 20px;
+        margin-right: 4px;
+    }
+    
+    .action-name {
+        font-size: 14px;
+    }
+    
+    .action-effect {
+        gap: 3px;
+    }
+    
+    .effect-icon {
+        padding: 1px 2px;
+        min-width: 18px;
+        font-size: 10px;
+    }
+    
+    /* 优化网格单元格在竖屏上的显示 */
+    .grid-cell, .placeholder-cell {
+        height: 58px;
+        min-height: 58px;
+    }
+    
+    .action-emoji-cell {
+        font-size: 20px;
     }
 }
 
