@@ -771,16 +771,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('ACTION_TYPES:', ACTION_TYPES);
             
-            // 分批加载音频文件以避免并发连接限制
-            // 首先准备所有需要加载的音频文件信息
+            // 准备所有需要加载的音频文件的ID信息
             const audioFiles = [];
             
             // 添加基础节奏音频
             audioFiles.push({ 
                 id: 'base_rhythm', 
-                filename: 'base_rhythm',
-                loaded: false,
-                attempts: 0
+                filename: 'base_rhythm'
             });
             
             // 添加所有行动对应的音频
@@ -788,154 +785,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 const soundFileName = `snd_${actionToFileName(action)}`;
                 audioFiles.push({ 
                     id: action, 
-                    filename: soundFileName,
-                    loaded: false,
-                    attempts: 0
+                    filename: soundFileName
                 });
             }
             
-            // 计算每个音频文件的加载进度权重
-            const totalFiles = audioFiles.length;
+            // 计算加载进度权重
             const baseProgress = 10; // 起始进度
             const maxProgress = 95; // 最大进度
-            const progressPerFile = (maxProgress - baseProgress) / totalFiles;
             
-            // 分批加载音频文件，每批最多3个
-            const batchSize = isMobileDevice() ? 1 : 2; // 移动设备每批1个，桌面设备每批2个
-            const maxAttempts = 3;
-            let loadSuccessCount = 0;
-            let loadFailCount = 0;
+            updateLoadingStatus(`开始加载音频文件包...`, baseProgress);
             
-            console.log(`开始分批加载音频，每批${batchSize}个文件`);
-            window.debugLog && window.debugLog(`分批加载音频，每批${batchSize}个`);
-            updateLoadingStatus(`开始加载音频文件 (0/${totalFiles})`, baseProgress);
-            
-            // 分批加载函数
-            async function loadBatch(startIndex) {
-                if (startIndex >= audioFiles.length) {
-                    // 所有批次都已加载完成
-                    console.log(`音频批量加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`);
-                    window.debugLog && window.debugLog(`音频加载: 成功 ${loadSuccessCount}, 失败 ${loadFailCount}`);
-                    updateLoadingStatus(`音频加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`, 95);
-                    
-                    // 检查是否有未加载的音频需要重试
-                    const unloadedFiles = audioFiles.filter(file => !file.loaded && file.attempts < maxAttempts);
-                    
-                    if (unloadedFiles.length > 0) {
-                        console.log(`重试加载 ${unloadedFiles.length} 个未加载的音频文件`);
-                        window.debugLog && window.debugLog(`重试加载 ${unloadedFiles.length} 个音频`);
-                        updateLoadingStatus(`重试加载失败的音频文件 (${unloadedFiles.length}个)...`, 95);
-                        
-                        // 重置索引，开始重试
-                        for (const file of unloadedFiles) {
-                            file.attempts++;
-                        }
-                        
-                        // 重新加载第一批未加载的文件
-                        return loadBatch(0);
-                    }
-                    
-                    // 对于仍未加载的文件，使用备用音效
-                    const stillUnloadedFiles = audioFiles.filter(file => !file.loaded);
-                    if (stillUnloadedFiles.length > 0) {
-                        console.log(`${stillUnloadedFiles.length} 个音频文件无法加载，使用备用音效`);
-                        
-                        for (const file of stillUnloadedFiles) {
-                            console.log(`音频 ${file.filename} 在 ${file.attempts} 次尝试后仍未加载，使用备用音效`);
-                            window.debugLog && window.debugLog(`使用备用音效: ${file.filename}`);
-                            
-                            if (file.id === 'base_rhythm') {
-                                console.log('使用空白音频作为基础节奏');
-                                audioBuffers['base_rhythm'] = createEmptyBuffer();
-                            } else {
-                                console.log(`为行动 ${file.id} 生成备用音效`);
-                                const buffer = await generateSound(file.id);
-                                audioBuffers[file.id] = buffer;
-                            }
-                        }
-                    }
-                    
-                    // 列出所有加载的音频
-                    console.log('已加载的音频缓冲区:', Object.keys(audioBuffers));
-                    
-                    // 初始化完成
+            try {
+                // 尝试从ZIP文件加载所有音频
+                const result = await loadAudioFromZip(audioFiles);
+                if (result) {
                     audioInitialized = true;
-                    // 如果所有文件都加载成功或者使用了备用音效，返回成功
-                    return (loadSuccessCount > 0);
+                    console.log('从ZIP文件加载音频成功');
+                    window.debugLog && window.debugLog('从ZIP文件加载音频成功');
+                    updateLoadingStatus(`音频加载完成`, 95);
+                    return true;
                 }
+            } catch (zipError) {
+                console.error('从ZIP文件加载音频失败:', zipError);
+                window.debugLog && window.debugLog(`ZIP加载失败: ${zipError.message}`);
                 
-                // 计算当前批次的结束索引
-                const endIndex = Math.min(startIndex + batchSize, audioFiles.length);
-                const currentBatch = audioFiles.slice(startIndex, endIndex);
-                const batchNumber = Math.floor(startIndex / batchSize) + 1;
-                const totalBatches = Math.ceil(audioFiles.length / batchSize);
-                
-                console.log(`加载第 ${batchNumber}/${totalBatches} 批音频 (${currentBatch.length} 个文件)`);
-                window.debugLog && window.debugLog(`加载第 ${batchNumber} 批音频`);
-                updateLoadingStatus(`加载音频 - 批次 ${batchNumber}/${totalBatches}`, baseProgress + progressPerFile * startIndex);
-                
-                // 找出当前批次中未加载且尝试次数小于最大尝试次数的文件
-                const filesToLoad = currentBatch.filter(file => !file.loaded && file.attempts < maxAttempts);
-                
-                // 如果当前批次中没有需要加载的文件，直接加载下一批
-                if (filesToLoad.length === 0) {
-                    return loadBatch(endIndex);
-                }
-                
-                // 加载当前批次中的文件
-                const promises = filesToLoad.map(file => {
-                    console.log(`尝试加载音频 ${file.filename}.mp3 (第 ${file.attempts + 1} 次尝试)`);
-                    window.debugLog && window.debugLog(`加载 ${file.filename}.mp3`);
-                    
-                    return loadSound(file.filename)
-                        .then(buffer => {
-                            console.log(`音频 ${file.filename} 加载成功`);
-                            window.debugLog && window.debugLog(`${file.filename} 加载成功`);
-                            
-                            // 保存音频缓冲区
-                            audioBuffers[file.id] = buffer;
-                            file.loaded = true;
-                            loadSuccessCount++;
-                            
-                            // 更新进度显示
-                            const currentProgress = baseProgress + progressPerFile * (startIndex + loadSuccessCount);
-                            updateLoadingStatus(`已加载 ${loadSuccessCount}/${totalFiles} 个音频文件`, currentProgress);
-                            
-                            return buffer;
-                        })
-                        .catch(error => {
-                            console.warn(`音频 ${file.filename} 加载失败 (尝试 ${file.attempts + 1}/${maxAttempts}):`, error);
-                            window.debugLog && window.debugLog(`${file.filename} 加载失败`);
-                            
-                            // 增加尝试次数
-                            file.attempts++;
-                            
-                            if (file.attempts >= maxAttempts) {
-                                loadFailCount++;
-                            }
-                            
-                            // 标记为未加载
-                            file.loaded = false;
-                            
-                            return null;
-                        });
-                });
-                
-                // 等待当前批次完成
-                await Promise.all(promises);
-                
-                // 短暂延迟，让浏览器有时间释放连接
-                const delayTime = isMobileDevice() ? 1000 : 500; // 移动设备延迟更长
-                await new Promise(resolve => setTimeout(resolve, delayTime));
-                
-                // 加载下一批
-                return loadBatch(endIndex);
+                // 如果ZIP加载失败，回退到生成备用音效
+                console.log('ZIP加载失败，使用备用音效系统');
+                updateLoadingStatus('ZIP加载失败，使用备用音效系统...', 50);
             }
             
-            // 开始加载第一批
-            const loadResult = await loadBatch(0);
-            
-            return loadResult;
+            // 如果ZIP加载失败，生成备用音效
+            try {
+                // 为所有行动生成备用音效
+                for (const action of ACTION_TYPES) {
+                    const buffer = await generateSound(action);
+                    audioBuffers[action] = buffer;
+                }
+                
+                // 创建一个空白的背景节奏
+                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                
+                // 标记为初始化完成
+                audioInitialized = true;
+                return true; // 使用备用音效成功
+            } catch (fallbackError) {
+                console.error('备用音效也初始化失败:', fallbackError);
+                window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
+                return false;
+            }
         } catch (error) {
             console.error('初始化音频失败:', error);
             window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
@@ -966,6 +863,99 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 从ZIP文件加载所有音频
+    async function loadAudioFromZip(audioFiles) {
+        try {
+            // 下载ZIP文件
+            console.log('开始下载音频ZIP包');
+            window.debugLog && window.debugLog('开始下载音频ZIP包');
+            updateLoadingStatus('下载音频包...', 20);
+            
+            const zipResponse = await fetch('sounds.zip');
+            if (!zipResponse.ok) {
+                throw new Error(`下载ZIP失败: ${zipResponse.status}`);
+            }
+            
+            // 获取ZIP文件数据
+            const zipData = await zipResponse.arrayBuffer();
+            console.log(`ZIP文件下载完成，大小: ${zipData.byteLength} 字节`);
+            window.debugLog && window.debugLog(`ZIP文件下载完成: ${(zipData.byteLength / 1024).toFixed(2)}KB`);
+            updateLoadingStatus('解压音频文件...', 40);
+            
+            // 加载JSZip库，如果尚未加载
+            if (typeof JSZip === 'undefined') {
+                throw new Error('JSZip库未加载，无法解压文件');
+            }
+            
+            // 解压ZIP文件
+            const zip = await JSZip.loadAsync(zipData);
+            console.log('ZIP文件解压成功，开始处理音频文件');
+            window.debugLog && window.debugLog('ZIP文件解压成功');
+            updateLoadingStatus('处理音频文件...', 60);
+            
+            // 处理所有音频文件
+            let loadedCount = 0;
+            const totalFiles = audioFiles.length;
+            
+            for (const file of audioFiles) {
+                const zipFilename = `${file.filename}.mp3`;
+                const zipEntry = zip.file(zipFilename);
+                
+                if (!zipEntry) {
+                    console.warn(`ZIP中未找到文件: ${zipFilename}`);
+                    window.debugLog && window.debugLog(`ZIP中未找到: ${zipFilename}`);
+                    
+                    // 如果是base_rhythm，创建空缓冲区
+                    if (file.id === 'base_rhythm') {
+                        audioBuffers['base_rhythm'] = createEmptyBuffer();
+                    } else {
+                        // 为缺失的音频创建备用音效
+                        const buffer = await generateSound(file.id);
+                        audioBuffers[file.id] = buffer;
+                    }
+                    continue;
+                }
+                
+                try {
+                    // 从ZIP中提取文件
+                    const arrayBuffer = await zipEntry.async('arraybuffer');
+                    console.log(`从ZIP中提取 ${zipFilename}, 大小: ${arrayBuffer.byteLength} 字节`);
+                    
+                    // 解码音频数据
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    console.log(`解码音频 ${zipFilename} 成功, 时长: ${audioBuffer.duration}秒`);
+                    
+                    // 保存音频缓冲区
+                    audioBuffers[file.id] = audioBuffer;
+                    loadedCount++;
+                    
+                    // 更新加载进度
+                    const progress = 60 + (loadedCount / totalFiles) * 35;
+                    updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
+                } catch (error) {
+                    console.error(`处理音频 ${zipFilename} 失败:`, error);
+                    window.debugLog && window.debugLog(`处理音频失败: ${zipFilename}`);
+                    
+                    // 为错误音频创建备用音效
+                    if (file.id === 'base_rhythm') {
+                        audioBuffers['base_rhythm'] = createEmptyBuffer();
+                    } else {
+                        const buffer = await generateSound(file.id);
+                        audioBuffers[file.id] = buffer;
+                    }
+                }
+            }
+            
+            console.log(`从ZIP加载音频完成: 成功 ${loadedCount}/${totalFiles} 个`);
+            window.debugLog && window.debugLog(`从ZIP加载: 成功 ${loadedCount}/${totalFiles}`);
+            return true;
+        } catch (error) {
+            console.error('从ZIP加载音频失败:', error);
+            window.debugLog && window.debugLog(`ZIP加载失败: ${error.message}`);
+            throw error;
+        }
+    }
+    
     // 创建空白的音频缓冲区
     function createEmptyBuffer() {
         if (!audioContext) {
