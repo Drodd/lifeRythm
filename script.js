@@ -771,472 +771,120 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('ACTION_TYPES:', ACTION_TYPES);
             
-            // 准备所有需要加载的音频文件的ID信息
+            // 准备所有需要生成的音频文件的ID信息
             const audioFiles = [];
             
             // 添加基础节奏音频
             audioFiles.push({ 
-                id: 'base_rhythm', 
-                filename: 'base_rhythm'
+                id: 'base_rhythm'
             });
             
             // 添加所有行动对应的音频
             for (const action of ACTION_TYPES) {
-                const soundFileName = `snd_${actionToFileName(action)}`;
                 audioFiles.push({ 
-                    id: action, 
-                    filename: soundFileName
+                    id: action
                 });
             }
             
-            // 计算加载进度权重
-            const baseProgress = 10; // 起始进度
-            const maxProgress = 95; // 最大进度
-            
-            updateLoadingStatus(`开始加载音频文件包...`, baseProgress);
-            
-            // 设置手动上传按钮事件
-            setupManualZipUpload(audioFiles);
+            updateLoadingStatus(`开始生成音频...`, 10);
             
             try {
-                // 尝试从ZIP文件加载所有音频
-                const result = await loadAudioFromZip(audioFiles);
-                if (result) {
-                    audioInitialized = true;
-                    console.log('从ZIP文件加载音频成功');
-                    window.debugLog && window.debugLog('从ZIP文件加载音频成功');
-                    updateLoadingStatus(`音频加载完成`, 95);
-                    return true;
-                }
-            } catch (zipError) {
-                console.error('从ZIP文件加载音频失败:', zipError);
-                window.debugLog && window.debugLog(`ZIP加载失败: ${zipError.message}`);
+                // 为所有行动生成音效
+                let loadedCount = 0;
+                const totalFiles = audioFiles.length;
                 
-                // 显示手动上传提示
-                const uploadButton = document.getElementById('uploadZipButton');
-                if (uploadButton) {
-                    uploadButton.style.backgroundColor = '#e53e3e';
-                    uploadButton.textContent = '自动加载失败，点击上传sounds.zip';
+                for (const file of audioFiles) {
+                    try {
+                        if (file.id === 'base_rhythm') {
+                            // 创建一个空白的背景节奏
+                            audioBuffers['base_rhythm'] = createEmptyBuffer();
+                            console.log('创建空白背景节奏');
+                        } else {
+                            // 为每个行动生成音效
+                            console.log(`为行动 ${file.id} 生成音效`);
+                            const buffer = await generateSound(file.id);
+                            audioBuffers[file.id] = buffer;
+                        }
+                        
+                        loadedCount++;
+                        // 更新进度
+                        const progress = 10 + (loadedCount / totalFiles) * 85;
+                        updateLoadingStatus(`生成音效 ${loadedCount}/${totalFiles}`, progress);
+                        
+                    } catch (error) {
+                        console.error(`为 ${file.id} 生成音效失败:`, error);
+                        
+                        // 创建备用音效
+                        if (file.id === 'base_rhythm') {
+                            audioBuffers['base_rhythm'] = createEmptyBuffer();
+                        } else {
+                            // 创建一个基本的音效
+                            audioBuffers[file.id] = createBasicSound();
+                        }
+                    }
                 }
                 
-                // 如果ZIP加载失败，回退到生成备用音效
-                console.log('ZIP加载失败，使用备用音效系统');
-                updateLoadingStatus('ZIP加载失败，使用备用音效系统...', 50);
-            }
-            
-            // 如果ZIP加载失败，生成备用音效
-            try {
-                // 为所有行动生成备用音效
-                for (const action of ACTION_TYPES) {
-                    const buffer = await generateSound(action);
-                    audioBuffers[action] = buffer;
-                }
+                console.log(`音效生成完成: ${loadedCount}/${totalFiles} 个`);
+                updateLoadingStatus(`音效生成完成: ${loadedCount}/${totalFiles} 个`, 95);
                 
-                // 创建一个空白的背景节奏
-                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                // 列出所有生成的音频
+                console.log('已生成的音效:', Object.keys(audioBuffers));
                 
                 // 标记为初始化完成
                 audioInitialized = true;
-                return true; // 使用备用音效成功
-            } catch (fallbackError) {
-                console.error('备用音效也初始化失败:', fallbackError);
-                window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
+                return true;
+                
+            } catch (generationError) {
+                console.error('生成音效失败:', generationError);
+                window.debugLog && window.debugLog(`音效生成失败: ${generationError.message}`);
                 return false;
             }
         } catch (error) {
             console.error('初始化音频失败:', error);
             window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
-            
-            // 初始化备用音效
-            console.log('使用备用音效系统');
-            window.debugLog && window.debugLog('使用备用音效系统');
-            updateLoadingStatus('音频加载失败，使用备用音效系统...', 90);
-            
-            try {
-                // 为所有行动生成备用音效
-                for (const action of ACTION_TYPES) {
-                    const buffer = await generateSound(action);
-                    audioBuffers[action] = buffer;
-                }
-                
-                // 创建一个空白的背景节奏
-                audioBuffers['base_rhythm'] = createEmptyBuffer();
-                
-                // 标记为初始化完成
-                audioInitialized = true;
-                return true; // 使用备用音效成功
-            } catch (fallbackError) {
-                console.error('备用音效也初始化失败:', fallbackError);
-                window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
-                return false;
-            }
+            return false;
         }
     }
 
-    // 设置手动上传ZIP文件
-    function setupManualZipUpload(audioFiles) {
-        const uploadButton = document.getElementById('uploadZipButton');
-        const fileInput = document.getElementById('zipFileInput');
+    // 创建基本的音效（作为备用）
+    function createBasicSound(frequency = 440) {
+        if (!frequency) frequency = 440;
         
-        if (!uploadButton || !fileInput) {
-            console.warn('手动上传按钮或文件输入框不存在');
-            return;
-        }
-        
-        // 点击按钮触发文件选择
-        uploadButton.addEventListener('click', () => {
-            fileInput.click();
-        });
-        
-        // 处理文件选择
-        fileInput.addEventListener('change', async (event) => {
-            if (event.target.files.length === 0) return;
-            
-            const file = event.target.files[0];
-            console.log(`选择了文件: ${file.name}, 大小: ${(file.size / 1024).toFixed(2)} KB`);
-            window.debugLog && window.debugLog(`选择了文件: ${file.name}`);
-            
-            // 检查是否为ZIP文件
-            if (!file.name.toLowerCase().endsWith('.zip')) {
-                alert('请选择ZIP格式的音频包文件！');
-                return;
-            }
-            
-            try {
-                updateLoadingStatus('正在处理上传的ZIP文件...', 20);
-                
-                // 读取文件
-                const fileData = await readFileAsArrayBuffer(file);
-                console.log(`文件读取完成，大小: ${fileData.byteLength} 字节`);
-                
-                // 使用JSZip处理文件
-                if (typeof JSZip === 'undefined') {
-                    throw new Error('JSZip库未加载，无法解压文件');
-                }
-                
-                updateLoadingStatus('正在解压ZIP文件...', 40);
-                const zip = await JSZip.loadAsync(fileData);
-                
-                // 处理ZIP文件内容
-                const fileCount = Object.keys(zip.files).length;
-                console.log(`ZIP文件解压成功，包含 ${fileCount} 个文件`);
-                window.debugLog && window.debugLog(`解压成功，${fileCount} 个文件`);
-                
-                // 列出所有文件
-                const fileList = Object.keys(zip.files).join(', ');
-                console.log(`ZIP内文件列表: ${fileList}`);
-                
-                updateLoadingStatus('开始处理音频文件...', 60);
-                
-                // 处理所有音频文件
-                let loadedCount = 0;
-                const totalFiles = audioFiles.length;
-                
-                for (const audioFile of audioFiles) {
-                    const filename = `${audioFile.filename}.mp3`;
-                    console.log(`查找文件: ${filename}`);
-                    
-                    // 尝试在ZIP中查找文件
-                    const zipEntry = zip.file(filename);
-                    
-                    // 如果找不到完整文件名，尝试查找不带前缀的文件名
-                    const simpleName = filename.replace('snd_', '');
-                    const altEntry = zipEntry || zip.file(simpleName);
-                    
-                    if (altEntry) {
-                        try {
-                            // 从ZIP提取文件
-                            const arrayBuffer = await altEntry.async('arraybuffer');
-                            console.log(`提取 ${altEntry.name} 成功, 大小: ${arrayBuffer.byteLength} 字节`);
-                            
-                            // 解码音频
-                            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                            console.log(`解码音频成功, 时长: ${audioBuffer.duration}秒`);
-                            
-                            // 保存到缓冲区
-                            audioBuffers[audioFile.id] = audioBuffer;
-                            loadedCount++;
-                            
-                            // 更新进度
-                            const progress = 60 + (loadedCount / totalFiles) * 35;
-                            updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
-                        } catch (error) {
-                            console.error(`处理音频文件 ${altEntry.name} 失败:`, error);
-                            
-                            // 生成备用音效
-                            if (audioFile.id === 'base_rhythm') {
-                                audioBuffers['base_rhythm'] = createEmptyBuffer();
-                            } else {
-                                const buffer = await generateSound(audioFile.id);
-                                audioBuffers[audioFile.id] = buffer;
-                            }
-                        }
-                    } else {
-                        console.warn(`ZIP中未找到文件: ${filename} 或 ${simpleName}`);
-                        
-                        // 生成备用音效
-                        if (audioFile.id === 'base_rhythm') {
-                            audioBuffers['base_rhythm'] = createEmptyBuffer();
-                        } else {
-                            const buffer = await generateSound(audioFile.id);
-                            audioBuffers[audioFile.id] = buffer;
-                        }
-                    }
-                }
-                
-                if (loadedCount > 0) {
-                    console.log(`从上传的ZIP加载音频完成: 成功 ${loadedCount}/${totalFiles} 个`);
-                    updateLoadingStatus(`音频加载完成: 成功 ${loadedCount}/${totalFiles} 个`, 95);
-                    
-                    // 标记音频初始化完成
-                    audioInitialized = true;
-                    
-                    // 隐藏加载屏幕并开始游戏
-                    const loadingScreen = document.getElementById('loading-screen');
-                    if (loadingScreen) {
-                        loadingScreen.style.display = 'none';
-                    }
-                    
-                    // 启动游戏
-                    startGame();
-                } else {
-                    updateLoadingStatus('未能从ZIP加载任何音频文件，使用备用音效', 50);
-                    
-                    // 生成所有备用音效
-                    for (const action of ACTION_TYPES) {
-                        const buffer = await generateSound(action);
-                        audioBuffers[action] = buffer;
-                    }
-                    
-                    audioBuffers['base_rhythm'] = createEmptyBuffer();
-                    audioInitialized = true;
-                    
-                    // 隐藏加载屏幕并开始游戏
-                    const loadingScreen = document.getElementById('loading-screen');
-                    if (loadingScreen) {
-                        loadingScreen.style.display = 'none';
-                    }
-                    
-                    // 启动游戏
-                    startGame();
-                }
-            } catch (error) {
-                console.error('处理上传的ZIP文件失败:', error);
-                updateLoadingStatus(`处理ZIP文件失败: ${error.message}`, 20);
-            }
-        });
-    }
-
-    // 将文件读取为ArrayBuffer
-    function readFileAsArrayBuffer(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = (event) => {
-                resolve(event.target.result);
-            };
-            
-            reader.onerror = (error) => {
-                reject(error);
-            };
-            
-            reader.readAsArrayBuffer(file);
-        });
-    }
-    
-    // 从ZIP文件加载所有音频
-    async function loadAudioFromZip(audioFiles) {
-        try {
-            // 在界面上显示详细日志
-            const showDetailedStatus = (msg) => {
-                console.log(msg);
-                window.debugLog && window.debugLog(msg);
-                updateLoadingStatus(msg, null); // 只更新消息，不更新进度
-            };
-
-            // 下载ZIP文件
-            showDetailedStatus('开始下载音频ZIP包...');
-            updateLoadingStatus('下载音频包...', 20);
-            
-            // 确保URL正确
-            const zipUrl = 'sounds.zip';
-            showDetailedStatus(`正在从 ${window.location.href}${zipUrl} 下载音频包`);
-            
-            try {
-                const zipResponse = await fetch(zipUrl);
-                
-                showDetailedStatus(`ZIP响应状态: ${zipResponse.status} ${zipResponse.statusText}`);
-                
-                if (!zipResponse.ok) {
-                    throw new Error(`下载ZIP失败: HTTP ${zipResponse.status} - ${zipResponse.statusText}`);
-                }
-                
-                // 获取ZIP文件数据
-                showDetailedStatus('开始读取ZIP数据...');
-                const zipData = await zipResponse.arrayBuffer();
-                const zipSizeKB = (zipData.byteLength / 1024).toFixed(2);
-                showDetailedStatus(`ZIP文件下载完成，大小: ${zipSizeKB} KB`);
-                updateLoadingStatus(`ZIP下载完成 (${zipSizeKB} KB)，准备解压...`, 40);
-                
-                // 检查JSZip库是否加载
-                if (typeof JSZip === 'undefined') {
-                    showDetailedStatus('错误: JSZip库未加载！请检查网络连接和控制台错误。');
-                    throw new Error('JSZip库未加载，无法解压文件');
-                }
-                
-                showDetailedStatus('JSZip库已加载，开始解压...');
-                
-                // 解压ZIP文件
-                try {
-                    const zip = await JSZip.loadAsync(zipData);
-                    const fileCount = Object.keys(zip.files).length;
-                    showDetailedStatus(`ZIP文件解压成功，包含 ${fileCount} 个文件`);
-                    
-                    // 列出ZIP内的所有文件
-                    const fileList = Object.keys(zip.files).join(', ');
-                    showDetailedStatus(`ZIP内文件列表: ${fileList}`);
-                    
-                    updateLoadingStatus('开始处理音频文件...', 60);
-                    
-                    // 处理所有音频文件
-                    let loadedCount = 0;
-                    const totalFiles = audioFiles.length;
-                    
-                    for (const file of audioFiles) {
-                        const zipFilename = `${file.filename}.mp3`;
-                        showDetailedStatus(`查找文件: ${zipFilename}`);
-                        
-                        const zipEntry = zip.file(zipFilename);
-                        
-                        if (!zipEntry) {
-                            showDetailedStatus(`警告: ZIP中未找到文件: ${zipFilename}`);
-                            
-                            // 检查是否有不带前缀的文件名
-                            const simpleName = zipFilename.replace('snd_', '');
-                            const altEntry = zip.file(simpleName);
-                            
-                            if (altEntry) {
-                                showDetailedStatus(`找到替代文件: ${simpleName}`);
-                                
-                                try {
-                                    const arrayBuffer = await altEntry.async('arraybuffer');
-                                    showDetailedStatus(`从ZIP中提取 ${simpleName}, 大小: ${arrayBuffer.byteLength} 字节`);
-                                    
-                                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                                    showDetailedStatus(`解码音频 ${simpleName} 成功, 时长: ${audioBuffer.duration}秒`);
-                                    
-                                    audioBuffers[file.id] = audioBuffer;
-                                    loadedCount++;
-                                    
-                                    // 更新加载进度
-                                    const progress = 60 + (loadedCount / totalFiles) * 35;
-                                    updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
-                                    continue;
-                                } catch (err) {
-                                    showDetailedStatus(`处理替代文件 ${simpleName} 失败: ${err.message}`);
-                                }
-                            }
-                            
-                            // 如果是base_rhythm，创建空缓冲区
-                            if (file.id === 'base_rhythm') {
-                                audioBuffers['base_rhythm'] = createEmptyBuffer();
-                                showDetailedStatus('使用空白音频作为基础节奏');
-                            } else {
-                                // 为缺失的音频创建备用音效
-                                showDetailedStatus(`为行动 ${file.id} 生成备用音效`);
-                                const buffer = await generateSound(file.id);
-                                audioBuffers[file.id] = buffer;
-                            }
-                            continue;
-                        }
-                        
-                        try {
-                            // 从ZIP中提取文件
-                            showDetailedStatus(`开始提取: ${zipFilename}`);
-                            const arrayBuffer = await zipEntry.async('arraybuffer');
-                            showDetailedStatus(`提取 ${zipFilename} 成功, 大小: ${arrayBuffer.byteLength} 字节`);
-                            
-                            // 解码音频数据
-                            showDetailedStatus(`开始解码: ${zipFilename}`);
-                            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                            showDetailedStatus(`解码 ${zipFilename} 成功, 时长: ${audioBuffer.duration}秒`);
-                            
-                            // 保存音频缓冲区
-                            audioBuffers[file.id] = audioBuffer;
-                            loadedCount++;
-                            
-                            // 更新加载进度
-                            const progress = 60 + (loadedCount / totalFiles) * 35;
-                            updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
-                        } catch (error) {
-                            showDetailedStatus(`处理音频 ${zipFilename} 失败: ${error.message}`);
-                            
-                            // 为错误音频创建备用音效
-                            if (file.id === 'base_rhythm') {
-                                audioBuffers['base_rhythm'] = createEmptyBuffer();
-                                showDetailedStatus('使用空白音频作为基础节奏');
-                            } else {
-                                showDetailedStatus(`为行动 ${file.id} 生成备用音效`);
-                                const buffer = await generateSound(file.id);
-                                audioBuffers[file.id] = buffer;
-                            }
-                        }
-                    }
-                    
-                    // 检查是否成功加载了至少一个文件
-                    if (loadedCount > 0) {
-                        showDetailedStatus(`成功从ZIP加载了 ${loadedCount}/${totalFiles} 个音频文件`);
-                        return true;
-                    } else {
-                        showDetailedStatus('未能从ZIP加载任何音频文件，使用备用音效');
-                        throw new Error('未能从ZIP加载任何音频文件');
-                    }
-                } catch (zipLoadError) {
-                    showDetailedStatus(`解压或处理ZIP文件时出错: ${zipLoadError.message}`);
-                    throw zipLoadError;
-                }
-            } catch (fetchError) {
-                showDetailedStatus(`下载ZIP文件时出错: ${fetchError.message}`);
-                throw fetchError;
-            }
-        } catch (error) {
-            console.error('从ZIP加载音频失败:', error);
-            window.debugLog && window.debugLog(`ZIP加载失败: ${error.message}`);
-            // 保持错误信息可见更长时间
-            updateLoadingStatus(`音频ZIP加载失败: ${error.message}`, 40);
-            await new Promise(resolve => setTimeout(resolve, 3000)); // 显示错误3秒
-            throw error;
-        }
-    }
-    
-    // 创建空白的音频缓冲区
-    function createEmptyBuffer() {
-        if (!audioContext) {
-            console.warn('音频上下文未初始化，无法创建空白缓冲区');
-            // 创建一个伪缓冲区对象作为替代
-            return {
-                duration: 0.1,
-                numberOfChannels: 1,
-                length: 4410, // 44100 * 0.1，标准采样率0.1秒的长度
-                getChannelData: function() {
-                    return new Float32Array(4410);
-                }
-            };
-        }
-        
+        const duration = 0.3; // 声音持续时间（秒）
         const sampleRate = audioContext.sampleRate;
-        const duration = 0.1; // 很短的声音
         const frameCount = sampleRate * duration;
         
         const audioBuffer = audioContext.createBuffer(1, frameCount, sampleRate);
         const channelData = audioBuffer.getChannelData(0);
         
-        // 填充静音数据
+        // 创建简单的正弦波，带有指数衰减
         for (let i = 0; i < frameCount; i++) {
-            channelData[i] = 0;
+            const t = i / sampleRate;
+            const envelope = Math.exp(-5 * t);
+            channelData[i] = 0.2 * Math.sin(2 * Math.PI * frequency * t) * envelope;
         }
         
         return audioBuffer;
+    }
+    
+    // 设置手动上传ZIP文件
+    function createEmptyBuffer() {
+        const sampleRate = audioContext ? audioContext.sampleRate : 44100;
+        const frameCount = sampleRate * 0.1; // 0.1秒的静音
+        
+        if (!audioContext) {
+            return {
+                duration: 0.1,
+                numberOfChannels: 1,
+                length: frameCount,
+                getChannelData: function() {
+                    return new Float32Array(frameCount);
+                }
+            };
+        }
+        
+        const buffer = audioContext.createBuffer(1, frameCount, sampleRate);
+        return buffer;
     }
     
     // 加载音频文件的函数
@@ -1353,76 +1001,201 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             const sampleRate = audioContext.sampleRate;
-            const duration = 0.5; // 声音持续时间（秒）
+            const duration = 0.4; // 声音持续时间（秒）
             const frameCount = sampleRate * duration;
             
             const audioBuffer = audioContext.createBuffer(1, frameCount, sampleRate);
             const channelData = audioBuffer.getChannelData(0);
             
+            // 根据行动类型设置不同的音色参数
             let frequency = 440; // 默认频率
-            let waveType = 'sine'; // 默认波形
+            let waveType = 'sine'; // 波形类型
+            let harmonics = 1; // 泛音数量
+            let attack = 0.01; // 起音时间
+            let decay = 0.3; // 衰减时间
+            let modulation = false; // 是否使用调制
+            let modFreq = 0; // 调制频率
             
-            // 根据行动类型设置不同的频率和波形
-            // 工作类
-            if (action === '工作' || action === '学习') {
-                frequency = 55;
-                waveType = 'triangle';
-            } 
-            // 休闲类
-            else if (action === '吃饭' || action === '冲咖啡' || action === '上厕所') {
-                frequency = 220;
-                waveType = 'square';
-            } 
-            // 娱乐类
-            else if (action === '阅读' || action === '看剧' || action === '刷手机') {
-                frequency = 261.63; // C4
-                waveType = 'sine';
-            } 
-            // 社交类
-            else if (action === '聊天' || action === '闲逛') {
-                frequency = 329.63; // E4
-                waveType = 'sawtooth';
-            } 
-            // 放松类
-            else if (action === '听歌' || action === '发呆' || action === '睡觉') {
-                frequency = 196; // G3
-                waveType = 'triangle';
-            } 
-            // 活跃类
-            else if (action === '运动' || action === '玩游戏' || action === '创作') {
-                frequency = 98; // G2
-                waveType = 'sawtooth';
-            } 
-            // 特殊类
-            else if (action === '炒股') {
-                frequency = 440; // A4
-                waveType = 'square';
+            // 为不同行动设置不同的音色参数
+            switch(action) {
+                case '工作':
+                    frequency = 392; // G4
+                    waveType = 'square';
+                    harmonics = 2;
+                    attack = 0.02;
+                    decay = 0.2;
+                    break;
+                case '吃饭':
+                    frequency = 349.23; // F4
+                    waveType = 'triangle';
+                    attack = 0.05;
+                    decay = 0.2;
+                    break;
+                case '阅读':
+                    frequency = 329.63; // E4
+                    waveType = 'sine';
+                    attack = 0.03;
+                    decay = 0.35;
+                    break;
+                case '听歌':
+                    frequency = 440; // A4
+                    waveType = 'sine';
+                    modulation = true;
+                    modFreq = 6;
+                    attack = 0.02;
+                    decay = 0.4;
+                    break;
+                case '看剧':
+                    frequency = 415.3; // G#4/Ab4
+                    waveType = 'triangle';
+                    attack = 0.04;
+                    decay = 0.3;
+                    break;
+                case '玩游戏':
+                    frequency = 466.16; // A#4/Bb4
+                    waveType = 'square';
+                    harmonics = 3;
+                    attack = 0.01;
+                    decay = 0.25;
+                    break;
+                case '聊天':
+                    frequency = 293.66; // D4
+                    waveType = 'sawtooth';
+                    attack = 0.01;
+                    decay = 0.15;
+                    break;
+                case '运动':
+                    frequency = 523.25; // C5
+                    waveType = 'square';
+                    harmonics = 2;
+                    attack = 0.005;
+                    decay = 0.1;
+                    break;
+                case '创作':
+                    frequency = 493.88; // B4
+                    waveType = 'triangle';
+                    modulation = true;
+                    modFreq = 4;
+                    attack = 0.03;
+                    decay = 0.4;
+                    break;
+                case '学习':
+                    frequency = 369.99; // F#4/Gb4
+                    waveType = 'sine';
+                    attack = 0.04;
+                    decay = 0.3;
+                    break;
+                case '刷手机':
+                    frequency = 277.18; // C#4/Db4
+                    waveType = 'sawtooth';
+                    attack = 0.01;
+                    decay = 0.2;
+                    break;
+                case '上厕所':
+                    frequency = 261.63; // C4
+                    waveType = 'triangle';
+                    attack = 0.02;
+                    decay = 0.1;
+                    break;
+                case '闲逛':
+                    frequency = 311.13; // D#4/Eb4
+                    waveType = 'sine';
+                    modulation = true;
+                    modFreq = 2;
+                    attack = 0.05;
+                    decay = 0.3;
+                    break;
+                case '炒股':
+                    frequency = 587.33; // D5
+                    waveType = 'sawtooth';
+                    attack = 0.01;
+                    decay = 0.25;
+                    break;
+                case '发呆':
+                    frequency = 246.94; // B3
+                    waveType = 'sine';
+                    attack = 0.08;
+                    decay = 0.5;
+                    break;
+                case '睡觉':
+                    frequency = 220; // A3
+                    waveType = 'sine';
+                    attack = 0.1;
+                    decay = 0.6;
+                    break;
+                default:
+                    // 使用随机值，确保每个未定义的行动有不同音色
+                    frequency = 220 + (action.charCodeAt(0) % 15) * 20;
+                    const waveTypes = ['sine', 'square', 'triangle', 'sawtooth'];
+                    waveType = waveTypes[action.length % waveTypes.length];
+                    attack = 0.02 + (action.length % 10) * 0.01;
+                    decay = 0.2 + (action.length % 5) * 0.1;
+                    break;
             }
             
-            // 填充音频数据
+            // 生成声音
             for (let i = 0; i < frameCount; i++) {
-                const t = i / sampleRate;
-                let sample = 0;
+                const t = i / sampleRate; // 当前时间（秒）
+                
+                // 创建包络
+                let envelope = 0;
+                if (t < attack) {
+                    // 起音阶段
+                    envelope = t / attack;
+                } else if (t < attack + decay) {
+                    // 衰减阶段
+                    envelope = 1 - ((t - attack) / decay);
+                } else {
+                    // 结束后静音
+                    envelope = 0;
+                }
+                
+                // 基础波形
+                let signal = 0;
+                const phase = 2 * Math.PI * frequency * t;
+                
+                // 调制
+                let modSignal = 1;
+                if (modulation) {
+                    modSignal = 1 + 0.1 * Math.sin(2 * Math.PI * modFreq * t);
+                }
                 
                 // 根据波形类型生成不同的波形
                 switch (waveType) {
                     case 'sine':
-                        sample = Math.sin(2 * Math.PI * frequency * t);
+                        signal = Math.sin(phase * modSignal);
                         break;
                     case 'square':
-                        sample = Math.sign(Math.sin(2 * Math.PI * frequency * t));
-                        break;
-                    case 'sawtooth':
-                        sample = 2 * (t * frequency - Math.floor(0.5 + t * frequency));
+                        signal = Math.sin(phase * modSignal) > 0 ? 0.7 : -0.7;
                         break;
                     case 'triangle':
-                        sample = Math.abs(2 * (t * frequency - Math.floor(t * frequency + 0.5))) * 2 - 1;
+                        signal = 2 * Math.abs(2 * ((phase * modSignal) / (2 * Math.PI) - Math.floor((phase * modSignal) / (2 * Math.PI) + 0.5))) - 1;
+                        break;
+                    case 'sawtooth':
+                        signal = 2 * ((phase * modSignal) / (2 * Math.PI) - Math.floor(0.5 + (phase * modSignal) / (2 * Math.PI)));
                         break;
                 }
                 
-                // 应用衰减包络
-                const envelope = Math.exp(-5 * t);
-                channelData[i] = sample * envelope * 0.5; // 减小音量
+                // 添加泛音
+                if (harmonics > 1) {
+                    for (let h = 2; h <= harmonics + 1; h++) {
+                        switch (waveType) {
+                            case 'sine':
+                                signal += (1/h) * Math.sin(h * phase * modSignal);
+                                break;
+                            case 'square':
+                                signal += (1/h) * (Math.sin(h * phase * modSignal) > 0 ? 0.7 : -0.7);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    // 归一化
+                    signal = signal / (1 + harmonics * 0.5);
+                }
+                
+                // 最终波形 = 包络 * 波形 * 音量
+                channelData[i] = envelope * signal * 0.3;
             }
             
             resolve(audioBuffer);
