@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 常量定义
-    const BPM = 140*5;
+    const BPM = 140;
     const PLAY_LIMIT = 60;
     const GRID_COLUMNS = 8;
     const BEAT_DURATION = 60 / BPM; // 一拍的持续时间（秒）- 修正为60/BPM
@@ -1461,6 +1461,48 @@ document.addEventListener('DOMContentLoaded', () => {
         // 找到这一列所有激活的音符
         const activeCells = document.querySelectorAll(`.grid-cell[data-column="${column}"].active`);
         
+        // 只有当有激活的格子时才播放背景节奏
+        if (activeCells.length > 0) {
+            try {
+                // 检查是否需要创建新的背景节奏增益节点
+                if (!backgroundRhythmGain) {
+                    backgroundRhythmGain = audioContext.createGain();
+                    backgroundRhythmGain.gain.value = 0.15; // 设置较低的音量
+                    backgroundRhythmGain.connect(audioContext.destination);
+                }
+                
+                // 重新创建背景节奏源（因为每次播放完后不能重用）
+                if (!backgroundRhythmSource || !backgroundRhythmSource.isPlaying) {
+                    // 如果之前有音源在播放，尝试停止它
+                    if (backgroundRhythmSource) {
+                        try {
+                            backgroundRhythmSource.stop();
+                        } catch (e) {
+                            // 忽略已经停止的错误
+                        }
+                    }
+                    
+                    backgroundRhythmSource = audioContext.createBufferSource();
+                    backgroundRhythmSource.buffer = audioBuffers['base_rhythm'];
+                    backgroundRhythmSource.loop = false;
+                    backgroundRhythmSource.connect(backgroundRhythmGain);
+                    
+                    // 标记为正在播放
+                    backgroundRhythmSource.isPlaying = true;
+                    
+                    // 播放背景节奏
+                    backgroundRhythmSource.start(0);
+                    
+                    // 监听播放结束事件
+                    backgroundRhythmSource.onended = function() {
+                        backgroundRhythmSource.isPlaying = false;
+                    };
+                }
+            } catch (error) {
+                console.error('播放背景节奏错误:', error);
+            }
+        }
+
         // 触发每个激活的音符，立即更新属性和视觉效果
         activeCells.forEach(cell => {
             const actionId = cell.getAttribute('data-action');
@@ -1729,8 +1771,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`见闻值达到要求(${requiredKnowledge})，自动解锁新行动: ${nextAction}`);
                 addAction(nextAction);
                 
-                // 消耗见闻值
-                updatePlayerStat('见闻', currentKnowledge - requiredKnowledge);
+                // 不再消耗见闻值
+                // updatePlayerStat('见闻', currentKnowledge - requiredKnowledge);
                 
                 // 更新显示
                 updateStatsDisplay();
@@ -1746,11 +1788,20 @@ document.addEventListener('DOMContentLoaded', () => {
             addTrackButton.classList.remove('disabled');
             addTrackButton.classList.add('unlockable');
         } else {
-            // 未满足解锁条件
-            addTrackButton.textContent = `见闻${requiredKnowledge} 领悟`;
-            addTrackButton.disabled = true;
-            addTrackButton.classList.add('disabled');
-            addTrackButton.classList.remove('unlockable');
+            // 未满足解锁条件，但仍然显示为可点击按钮（只需要达到见闻值要求）
+            addTrackButton.textContent = `领悟新行动`;
+            
+            // 检查是否达到见闻值要求
+            if (currentKnowledge >= requiredKnowledge) {
+                addTrackButton.disabled = false;
+                addTrackButton.classList.remove('disabled');
+                addTrackButton.classList.add('unlockable');
+            } else {
+                addTrackButton.textContent = `需要见闻${requiredKnowledge}`;
+                addTrackButton.disabled = true;
+                addTrackButton.classList.add('disabled');
+                addTrackButton.classList.remove('unlockable');
+            }
         }
     }
     
@@ -2429,9 +2480,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 使用addAction替代未定义的unlockNewAction
                     addAction(action);
                     
-                    // 消耗见闻值
-                    const requiredKnowledge = getNextUnlockRequirement();
-                    updatePlayerStat('见闻', playerStats.见闻 - requiredKnowledge);
+                    // 不再消耗见闻值
+                    // const requiredKnowledge = getNextUnlockRequirement();
+                    // updatePlayerStat('见闻', playerStats.见闻 - requiredKnowledge);
                     
                     // 更新显示
                     updateStatsDisplay();
@@ -3028,30 +3079,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 启动背景节奏播放
+    // 启动背景节奏播放准备
     function startBackgroundRhythmPlayback() {
         try {
-            // 创建音频源
-            backgroundRhythmSource = audioContext.createBufferSource();
-            backgroundRhythmSource.buffer = audioBuffers['base_rhythm'];
-            backgroundRhythmSource.loop = true; // 设置循环播放
+            // 如果已存在，先清理
+            if (backgroundRhythmSource) {
+                try {
+                    backgroundRhythmSource.stop();
+                } catch (e) {
+                    // 忽略错误
+                }
+                backgroundRhythmSource = null;
+            }
+            
+            if (backgroundRhythmGain) {
+                try {
+                    backgroundRhythmGain.disconnect();
+                } catch (e) {
+                    // 忽略错误
+                }
+            }
             
             // 创建增益节点
             backgroundRhythmGain = audioContext.createGain();
             backgroundRhythmGain.gain.value = 0.15; // 设置较低的音量
-            
-            // 连接音频节点
-            backgroundRhythmSource.connect(backgroundRhythmGain);
             backgroundRhythmGain.connect(audioContext.destination);
             
-            // 播放音频
-            backgroundRhythmSource.start(0);
-            
-            console.log('背景节奏开始播放');
-            window.debugLog && window.debugLog('背景节奏开始播放');
+            console.log('背景节奏已准备好，等待格子激活触发');
+            window.debugLog && window.debugLog('背景节奏已准备好');
         } catch (error) {
-            console.error('播放背景节奏错误:', error);
-            window.debugLog && window.debugLog(`背景节奏播放错误: ${error.message}`);
+            console.error('准备背景节奏错误:', error);
+            window.debugLog && window.debugLog(`背景节奏准备错误: ${error.message}`);
         }
     }
 
@@ -3060,12 +3118,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (backgroundRhythmSource) {
             try {
                 backgroundRhythmSource.stop();
+                backgroundRhythmSource.isPlaying = false;
             } catch (error) {
                 // 忽略已停止的音频源错误
             }
             backgroundRhythmSource = null;
+        }
+        
+        if (backgroundRhythmGain) {
+            try {
+                backgroundRhythmGain.disconnect();
+            } catch (error) {
+                // 忽略断开连接错误
+            }
             backgroundRhythmGain = null;
         }
+        
+        console.log('背景节奏已停止');
     }
 
     // 测试音频加载和播放函数
