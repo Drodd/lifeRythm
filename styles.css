@@ -516,9 +516,10 @@ body {
     height: 100%;
     position: relative;
     overflow-y: auto;
-    background-color: #444;
-    background-image: none;
-    padding: 0;
+    background-color: #333;
+    background-image: linear-gradient(to bottom, #2c2c2c, #383838);
+    padding: 8px;
+    border-radius: 4px;
 }
 
 /* 添加轨道按钮的样式 */
@@ -552,11 +553,11 @@ body {
 
 /* 轨道按钮样式 - 现在与网格单元格在同一行 */
 .track-button {
-    padding: 4px 6px; /* 减小内边距以适应更窄的宽度 */
-    background-color: #444;
+    padding: 4px 6px;
+    background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
     border: none;
-    border-bottom: 1px solid #555;
-    border-right: 1px solid #555;
+    border-bottom: 1px solid #444;
+    border-right: 1px solid #444;
     text-align: left;
     cursor: pointer;
     min-height: 60px;
@@ -564,16 +565,21 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: background-color 0.3s;
+    transition: all 0.3s ease;
     box-sizing: border-box;
     color: white;
     grid-column: 1;
-    width: 90px; /* 设置固定宽度为90px */
-    overflow: hidden; /* 防止内容溢出 */
+    width: 90px;
+    overflow: hidden;
+    margin: 2px;
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .track-button:hover {
-    background-color: #555;
+    background: linear-gradient(to bottom, #444, #333);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .track-button.disabled {
@@ -649,66 +655,126 @@ body {
 .playhead {
     position: absolute;
     top: 0;
-    left: 90px; /* 从动作按钮列的右侧开始，宽度从150px减少到90px */
+    left: 90px;
     height: 100%;
-    width: 4px; /* 增加宽度 */
-    background-color: #ff5722;
-    z-index: 50; /* 提高层级 */
-    box-shadow: 0 0 8px rgba(255, 87, 34, 0.9); /* 增强阴影效果 */
+    width: 4px;
+    background-color: #f50057; /* 更亮丽的颜色 */
+    z-index: 50;
+    box-shadow: 0 0 12px rgba(245, 0, 87, 0.8); /* 更明显的光晕 */
     pointer-events: none;
-    transition: none; /* 移除过渡效果以确保准确的位置更新 */
+    transition: none;
+    border-radius: 2px; /* 轻微圆角 */
 }
 
 /* 网格容器样式 */
 #gridContainer {
     display: grid;
-    grid-template-columns: repeat(8, 1fr); /* 从16列减少到8列 */
-    gap: 0;
-    padding: 0;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px; /* 增加一点缝隙 */
+    padding: 8px;
     margin: 0;
     width: 100%;
     box-sizing: border-box;
     border-collapse: collapse;
+    background-color: #333;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    border-radius: 5px; /* 添加圆角 */
 }
 
 /* 网格单元格样式 */
 .grid-cell {
-    height: 60px; /* 调整为与左侧行动按钮一致的高度 */
+    height: 60px;
     min-height: 60px;
-    max-width: none; /* 移除最大宽度限制 */
-    background-color: #555;
-    border-radius: 0;
+    max-width: none;
+    background: linear-gradient(145deg, #4a4a4a, #424242);
+    border-radius: 3px;
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease-in-out;
     box-sizing: border-box;
-    margin: 0;
-    border: 1px solid #444;
+    margin: 2px;
+    border: 1px solid #3a3a3a;
     position: relative;
     outline: none;
     padding: 0;
+    box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.05);
 }
 
 .grid-cell:hover {
-    background-color: #666;
+    background: linear-gradient(145deg, #525252, #474747);
+    transform: scale(1.02);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+    border-color: #555;
 }
 
 .grid-cell.active {
-    background-color: #1e88e5;
-    box-shadow: none;
-    border: 1px solid #0d47a1;
+    background: linear-gradient(145deg, #8e44ad, #9b59b6); /* 富有艺术感的紫色 */
+    box-shadow: 0 0 12px rgba(142, 68, 173, 0.6);
+    border: 1px solid #a569bd;
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+}
+
+/* 添加激活单元格的微妙动画效果 */
+.grid-cell.active::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%);
+    opacity: 0;
+    animation: pulse-light 3s infinite;
+    z-index: -1;
+}
+
+.grid-cell.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+    transform: translateX(-100%);
+    animation: shimmer-effect 3s infinite;
+    z-index: 1;
+}
+
+@keyframes shimmer-effect {
+    0% { transform: translateX(-100%); }
+    20% { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-light {
+    0% { opacity: 0.1; transform: scale(0.9) rotate(0deg); }
+    50% { opacity: 0.3; transform: scale(1.1) rotate(10deg); }
+    100% { opacity: 0.1; transform: scale(0.9) rotate(0deg); }
 }
 
 .grid-cell.current {
-    background-color: rgba(255, 87, 34, 0.2);
-    border-color: rgba(255, 87, 34, 0.4);
+    background: linear-gradient(145deg, #e57373, #ef5350);
+    border-color: #ef9a9a;
+    box-shadow: 0 0 8px rgba(239, 83, 80, 0.4);
+    z-index: 1;
 }
 
 .grid-cell.active.current {
-    background-color: #42a5f5;
-    border-color: #1565c0;
+    background: linear-gradient(145deg, #7b1fa2, #6a1b9a); /* 深紫色 */
+    border-color: #9c27b0;
+    box-shadow: 0 0 15px rgba(156, 39, 176, 0.7);
+    animation: pulse-active 1.5s infinite alternate;
+    z-index: 3;
+}
+
+@keyframes pulse-active {
+    from { box-shadow: 0 0 12px rgba(156, 39, 176, 0.7); }
+    to { box-shadow: 0 0 20px rgba(186, 104, 200, 0.9); }
 }
 
 .action-emoji-cell {
@@ -719,11 +785,20 @@ body {
 
 /* 占位单元格 */
 .placeholder-cell {
-    background-color: #555;
-    opacity: 0.8;
-    height: 60px; /* 调整为与左侧行动按钮一致的高度 */
+    background: linear-gradient(145deg, #3d3d3d, #363636);
+    opacity: 0.7;
+    height: 60px;
     min-height: 60px;
-    border: 1px solid #444;
+    border: 1px solid #2d2d2d;
+    box-shadow: none;
+    transition: all 0.3s ease;
+}
+
+/* 添加悬停效果 */
+.placeholder-cell:hover {
+    opacity: 0.9;
+    border-color: #444;
+    background: linear-gradient(145deg, #424242, #3a3a3a);
 }
 
 /* 动画 */
@@ -1044,4 +1119,543 @@ body {
     animation: shimmer 2.5s infinite;
     animation-delay: 0.5s; /* 错开动画 */
     transform: skewX(-20deg);
+}
+
+/* 游戏开始界面样式 */
+.start-screen {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.start-screen::before {
+    content: '';
+    position: absolute;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(circle, transparent 20%, #090a0f 70%);
+    top: -25%;
+    left: -25%;
+    opacity: 0.7;
+    animation: pulse 8s infinite alternate;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.7; }
+    50% { transform: scale(1); opacity: 0.9; }
+    100% { transform: scale(0.95); opacity: 0.7; }
+}
+
+.start-content {
+    position: relative;
+    width: 90%;
+    max-width: 600px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(5px);
+    animation: fadeIn 1s ease-out;
+    overflow: hidden;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.game-title {
+    font-size: 3rem;
+    margin: 0 0 5px 0;
+    font-weight: 700;
+    color: #ff5252;
+    text-shadow: 0 2px 10px rgba(255, 82, 82, 0.7);
+    letter-spacing: 3px;
+}
+
+.title-decoration {
+    display: flex;
+    justify-content: center;
+    margin: 10px auto 20px;
+    gap: 8px;
+    height: 20px;
+}
+
+.rhythm-bar {
+    width: 5px;
+    height: 100%;
+    background-color: #4caf50;
+    border-radius: 2px;
+    animation: rhythm-animation 1.8s infinite;
+    transform-origin: bottom;
+}
+
+.rhythm-bar:nth-child(1) {
+    animation-delay: 0s;
+    background-color: #ffd700;
+}
+
+.rhythm-bar:nth-child(2) {
+    animation-delay: 0.2s;
+    background-color: #4caf50;
+}
+
+.rhythm-bar:nth-child(3) {
+    animation-delay: 0.4s;
+    background-color: #ff5252;
+}
+
+.rhythm-bar:nth-child(4) {
+    animation-delay: 0.6s;
+    background-color: #2196f3;
+}
+
+@keyframes rhythm-animation {
+    0%, 100% { transform: scaleY(0.3); }
+    50% { transform: scaleY(1); }
+}
+
+.game-subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+    font-weight: 300;
+}
+
+.rules-container {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 0 auto 25px;
+    text-align: left;
+}
+
+.rules-container h2 {
+    font-size: 1.5rem;
+    margin-top: 0;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.rules-container ul {
+    padding-left: 20px;
+    margin: 0;
+}
+
+.rules-container li {
+    margin-bottom: 10px;
+    line-height: 1.4;
+    color: #ccc;
+}
+
+.start-button {
+    background: linear-gradient(45deg, #ff5252, #ff7043);
+    border: none;
+    color: white;
+    padding: 12px 40px;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(255, 82, 82, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.start-button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shine 3s infinite;
+}
+
+@keyframes shine {
+    0% { left: -100%; }
+    20% { left: 100%; }
+    100% { left: 100%; }
+}
+
+.start-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 20px rgba(255, 82, 82, 0.5);
+}
+
+.start-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(255, 82, 82, 0.3);
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+    .game-title {
+        font-size: 2.2rem;
+    }
+    
+    .game-subtitle {
+        font-size: 1rem;
+    }
+    
+    .rules-container {
+        padding: 10px;
+    }
+    
+    .rules-container li {
+        font-size: 0.9rem;
+    }
+    
+    .start-button {
+        padding: 10px 30px;
+        font-size: 1.1rem;
+    }
+}
+
+/* 重置游戏按钮样式 */
+.reset-game-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: all 0.2s ease;
+}
+
+.reset-game-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: rotate(30deg);
+}
+
+.reset-game-button:active {
+    transform: rotate(60deg);
+}
+
+.reset-game-button svg {
+    fill: white;
+    width: 16px;
+    height: 16px;
+}
+
+/* 结算界面样式 */
+.settlement-screen {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: linear-gradient(135deg, #0f0f1e 0%, #1e1e3f 50%, #2a2a4a 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.settlement-screen::before {
+    content: '';
+    position: absolute;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(circle, rgba(64, 64, 120, 0.2) 20%, rgba(9, 10, 15, 0.8) 70%);
+    top: -25%;
+    left: -25%;
+    opacity: 0.8;
+    animation: settlement-pulse 10s infinite alternate;
+}
+
+@keyframes settlement-pulse {
+    0% { transform: scale(0.98); opacity: 0.8; }
+    50% { transform: scale(1.02); opacity: 0.9; }
+    100% { transform: scale(0.98); opacity: 0.8; }
+}
+
+.settlement-content {
+    position: relative;
+    width: 90%;
+    max-width: 700px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 30px rgba(88, 88, 200, 0.2);
+    backdrop-filter: blur(8px);
+    animation: settlement-fade-in 1.2s ease-out;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes settlement-fade-in {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.settlement-title {
+    font-size: 2.2rem;
+    margin: 0 0 10px 0;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(128, 128, 255, 0.6);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+}
+
+.settlement-decoration {
+    display: flex;
+    justify-content: center;
+    margin: 15px auto 30px;
+    gap: 12px;
+    height: 24px;
+}
+
+.settlement-decoration .rhythm-bar {
+    width: 6px;
+    height: 100%;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(128, 128, 255, 0.7);
+    animation: settlement-rhythm 2.5s infinite;
+}
+
+.settlement-decoration .rhythm-bar:nth-child(1) {
+    animation-delay: 0s;
+    background-color: #e3b587;
+}
+
+.settlement-decoration .rhythm-bar:nth-child(2) {
+    animation-delay: 0.3s;
+    background-color: #c792ea;
+}
+
+.settlement-decoration .rhythm-bar:nth-child(3) {
+    animation-delay: 0.6s;
+    background-color: #80cbc4;
+}
+
+.settlement-decoration .rhythm-bar:nth-child(4) {
+    animation-delay: 0.9s;
+    background-color: #f07178;
+}
+
+@keyframes settlement-rhythm {
+    0%, 100% { transform: scaleY(0.4); opacity: 0.7; }
+    50% { transform: scaleY(1); opacity: 1; }
+}
+
+.music-title-container {
+    margin: 0 auto 40px;
+    position: relative;
+}
+
+.music-title-label {
+    font-size: 1rem;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.music-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 10px 0;
+    color: #f0f0f0;
+    text-shadow: 0 3px 15px rgba(128, 128, 255, 0.7);
+    position: relative;
+    display: inline-block;
+}
+
+.music-title::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    bottom: -10px;
+    left: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+}
+
+.quote-container {
+    position: relative;
+    max-width: 80%;
+    margin: 40px auto 50px;
+    padding: 20px 30px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.quote-icon {
+    position: absolute;
+    top: -10px;
+    left: 15px;
+    font-size: 3rem;
+    color: rgba(255, 255, 255, 0.2);
+    transform: rotate(180deg);
+}
+
+.musician-quote {
+    font-size: 1.3rem;
+    line-height: 1.6;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 15px 0;
+    text-align: left;
+}
+
+.quote-attribution {
+    text-align: right;
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.continue-button {
+    background: linear-gradient(45deg, #5c6bc0, #7986cb);
+    border: none;
+    color: white;
+    padding: 15px 45px;
+    font-size: 1.3rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    box-shadow: 0 5px 20px rgba(92, 107, 192, 0.4);
+    position: relative;
+    overflow: hidden;
+    margin-top: 20px;
+    letter-spacing: 1px;
+}
+
+.continue-button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: continue-button-shine 4s infinite;
+}
+
+@keyframes continue-button-shine {
+    0% { left: -100%; }
+    20% { left: 100%; }
+    100% { left: 100%; }
+}
+
+.continue-button:hover {
+    background: linear-gradient(45deg, #3f51b5, #5c6bc0);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(92, 107, 192, 0.5);
+}
+
+.continue-button:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 15px rgba(92, 107, 192, 0.3);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .settlement-title {
+        font-size: 1.8rem;
+    }
+    
+    .music-title {
+        font-size: 2.5rem;
+    }
+    
+    .musician-quote {
+        font-size: 1.1rem;
+    }
+    
+    .quote-container {
+        padding: 15px 20px;
+    }
+    
+    .continue-button {
+        padding: 12px 35px;
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .settlement-content {
+        padding: 30px 20px;
+    }
+    
+    .settlement-title {
+        font-size: 1.5rem;
+    }
+    
+    .music-title {
+        font-size: 2rem;
+    }
+    
+    .musician-quote {
+        font-size: 1rem;
+    }
+    
+    .continue-button {
+        padding: 10px 30px;
+        font-size: 1rem;
+    }
+}
+
+/* 游戏结束时结算界面的特殊样式 */
+.settlement-screen.game-over .settlement-title {
+    color: #ff5252;
+    text-shadow: 0 2px 10px rgba(255, 82, 82, 0.6);
+}
+
+.settlement-screen.game-over .music-title-label {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: none;
+    letter-spacing: 1px;
+}
+
+.settlement-screen.game-over .music-title {
+    color: #ff9e80;
+    text-shadow: 0 3px 15px rgba(255, 82, 82, 0.7);
+    font-size: 2.5rem;
+    margin: 10px 0 20px 0;
+}
+
+.settlement-screen.game-over .continue-button {
+    background: linear-gradient(45deg, #f44336, #ff5252);
+    box-shadow: 0 5px 20px rgba(244, 67, 54, 0.4);
+    margin-top: 30px;
+}
+
+.settlement-screen.game-over .continue-button:hover {
+    background: linear-gradient(45deg, #d32f2f, #f44336);
+    box-shadow: 0 8px 25px rgba(244, 67, 54, 0.5);
+}
+
+.settlement-screen.game-over .quote-container {
+    background-color: rgba(255, 82, 82, 0.05);
+    padding: 15px 20px;
+}
+
+.settlement-screen.game-over .quote-attribution {
+    opacity: 0.7;
 } 

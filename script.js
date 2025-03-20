@@ -22,6 +22,95 @@ window.addEventListener('error', function(event) {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 游戏开始界面逻辑
+    const startScreen = document.getElementById('startScreen');
+    const gameContainer = document.getElementById('gameContainer');
+    const startGameButton = document.getElementById('startGameButton');
+    const settlementScreen = document.getElementById('settlementScreen');
+    const continueButton = document.getElementById('continueButton');
+    
+    // 点击开始游戏按钮
+    startGameButton.addEventListener('click', () => {
+        // 隐藏开始界面
+        startScreen.style.opacity = '0';
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+            
+            // 显示游戏界面
+            gameContainer.style.display = 'flex';
+            
+            // 初始化游戏
+            initializeGame();
+            
+            // 自动开始播放
+            startPlayback();
+        }, 500);
+        
+        // 添加过渡效果
+        startScreen.style.transition = 'opacity 0.5s ease';
+    });
+    
+    // 点击继续演奏按钮
+    continueButton.addEventListener('click', () => {
+        // 注意：此事件监听器将被showSettlementScreen函数中的onclick属性覆盖
+        // 保留此代码是为了向后兼容
+        
+        // 隐藏结算界面
+        settlementScreen.style.display = 'none';
+        
+        // 显示游戏界面
+        gameContainer.style.display = 'flex';
+        
+        // 继续播放
+        startPlayback();
+    });
+    
+    // 游戏初始化函数
+    function initializeGame() {
+        console.log('开始游戏初始化...');
+        
+        // 重构顶部布局
+        restructureHeader();
+        
+        // 获取DOM元素
+        if (!getDOMElements()) {
+            console.error('无法获取关键DOM元素，中止初始化');
+            window.debugLog && window.debugLog('DOM元素获取失败，可能需要刷新页面');
+            return;
+        }
+        
+        // 添加重置按钮事件监听
+        const resetGameButton = document.getElementById('resetGameButton');
+        if (resetGameButton) {
+            resetGameButton.addEventListener('click', () => {
+                // 确认用户真的想重置游戏
+                if (confirm('确定要重新开始游戏吗？当前进度将丢失。')) {
+                    resetPlayCount();
+                    // 重新开始播放
+                    if (!isPlaying) {
+                        startPlayback();
+                    }
+                }
+            });
+        }
+        
+        // 初始化网格
+        initGrid();
+        
+        // 初始化其他UI元素
+        initTrackButtons();
+        initPresetNotes();
+        initAudio();
+        
+        // 更新显示
+        updateStatsDisplay();
+        updateSecondaryStats();
+        updateAllActionButtonStyles();
+        updateUnlockButtonState();
+        
+        console.log('游戏初始化完成');
+    }
+
     // 常量定义
     const BPM = 140;
     const PLAY_LIMIT = 60;
@@ -33,14 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const ACTION_TYPES = [
         '工作', '吃饭', '阅读', '听歌', '看剧', 
         '玩游戏', '聊天', '运动', '创作', '学习', 
-        '刷手机', '上厕所', '闲逛', 
-        '泡茶', '炒股', '发呆', '睡觉'
+        '刷手机', '上厕所', '闲逛', '炒股', '发呆', '睡觉'
     ];
     
     // 已添加的行动（初始有2个）
     const addedActions = [
         { id: '工作', name: '工作' },
-        { id: '吃饭', name: '吃饭' }
+        { id: '吃饭', name: '吃饭' },
+        { id: '刷手机', name: '刷手机' }
     ];
     
     // 声明引用变量，不使用const，以便可以重新赋值
@@ -61,8 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // 尝试获取所有必要的DOM元素
             trackList = null; // 不再使用轨道列表
             gridContainer = document.getElementById('gridContainer');
-            playButton = document.getElementById('playButton');
-            resetButton = document.getElementById('resetButton');
             playCount = document.getElementById('playCount');
             playLimit = document.getElementById('playLimit');
             playhead = document.querySelector('.playhead');
@@ -72,8 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // 记录找到的每个元素，用于调试
             console.log('获取DOM元素状态:', {
                 gridContainer: !!gridContainer,
-                playButton: !!playButton,
-                resetButton: !!resetButton,
                 playCount: !!playCount,
                 playLimit: !!playLimit,
                 playhead: !!playhead,
@@ -82,14 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // 检查是否所有必要的元素都被找到
-            if (!gridContainer || !playButton || !resetButton || 
-                !playCount || !playLimit || !playhead || 
+            if (!gridContainer || !playCount || !playLimit || !playhead || 
                 !statsContainer || !compositionArea) {
                 
                 const missingElements = [
                     !gridContainer ? 'gridContainer ' : '',
-                    !playButton ? 'playButton ' : '',
-                    !resetButton ? 'resetButton ' : '',
                     !playCount ? 'playCount ' : '',
                     !playLimit ? 'playLimit ' : '',
                     !playhead ? 'playhead ' : '',
@@ -155,16 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 基于解锁次数计算见闻需求
     function calculateKnowledgeRequirement(unlockCount) {
         // 初始两个行动无需见闻值（工作和吃饭）
-        // 从第3个行动开始需要见闻值
+        // 从第4个行动开始需要见闻值
         const baseRequirement = 10; // 第一次解锁需要10点见闻
         const increaseRate = 10 * unlockCount;    // 每次增加10*解锁次数
         
-        if (unlockCount < 2) {
+        if (unlockCount < 3) {
             return 0;
         }
         
-        // 解锁次数从0开始计算，所以第3个行动是unlockCount=2
-        return baseRequirement + (unlockCount - 2) * increaseRate;
+        // 解锁次数从0开始计算，所以第4个行动是unlockCount=3
+        return baseRequirement + (unlockCount - 3) * increaseRate;
     }
     
     // 游戏状态
@@ -194,23 +276,23 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 行动对属性的影响映射
     const ACTION_EFFECTS = {
-        '工作': { 金钱: 2, 见闻: 1, 欲望: 1 },
+        '工作': { 金钱: 2, 欲望: 1 },
         '吃饭': { 金钱: -1, 欲望: -1 },
         '阅读': { 见闻: 2, 欲望: -1 },
         '听歌': { 见闻: 1, 欲望: -1 },
         '看剧': { 见闻: 1, 欲望: -1 },
         '玩游戏': { 见闻: 1, 欲望: 1 },
-        '聊天': { 见闻: 1, 欲望: 1 },
+        '聊天': { 见闻: 1, 欲望: 2 },
         '运动': { 见闻: 1, 欲望: -2 },
         '创作': { 见闻: 2, 欲望: -1 },
-        '学习': { 见闻: 2, 欲望: 1 },
-        '刷手机': { 见闻: 1 , 欲望: 2 },
+        '学习': { 见闻: 5 },
+        '刷手机': { 见闻: 2 , 欲望: 1 },
         '上厕所': { 见闻: -1, 欲望: -1 },
         '闲逛': { 见闻: 1 },
         '冲咖啡': { 欲望: -1 },
-        '炒股': { 见闻: 1, 欲望: 1 },
+        '炒股': { 金钱: 0, 欲望: 1 },
         '发呆': { 欲望: -1 },
-        '睡觉': { 欲望: -1 },
+        '睡觉': { 欲望: -2 },
     };
     
     // 行动emoji和效果映射
@@ -228,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
         '刷手机': '📱',
         '上厕所': '🚽',
         '闲逛': '🚶',
-        '泡茶': '🍵',
         '炒股': '📈',
         '发呆': '😶',
         '睡觉': '😴'
@@ -440,13 +521,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (stat === '见闻') icon = '📚';
                     else if (stat === '欲望') icon = '🔥';
                     
-                    // 添加+/-符号
-                    if (value > 0) {
+                    // 添加符号
+                    if (value >= 0) {
                         effectIconSpan.className += ' positive-effect';
-                        effectIconSpan.textContent = `${icon}+`;
+                        effectIconSpan.textContent = `${icon}`;
                     } else {
                         effectIconSpan.className += ' negative-effect';
-                        effectIconSpan.textContent = `${icon}-`;
+                        effectIconSpan.textContent = `${icon}`;
                     }
                     
                     effectSpan.appendChild(effectIconSpan);
@@ -659,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 waveType = 'triangle';
             } 
             // 休闲类
-            else if (action === '吃饭' || action === '喝水' || action === '冲咖啡' || action === '泡茶' || action === '上厕所') {
+            else if (action === '吃饭' || action === '冲咖啡' || action === '上厕所') {
                 frequency = 220;
                 waveType = 'square';
             } 
@@ -674,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 waveType = 'sawtooth';
             } 
             // 放松类
-            else if (action === '听歌' || action === '发呆' || action === '睡觉' || action === '冥想') {
+            else if (action === '听歌' || action === '发呆' || action === '睡觉') {
                 frequency = 196; // G3
                 waveType = 'triangle';
             } 
@@ -880,7 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatePlayerStat('欲望', 0);
                     
                     // 检查金钱是否小于等于0
-                    if (playerStats.金钱 <= 0) {
+                    if (playerStats.金钱 < 0) {
                         playerStats.金钱 = 0; // 确保金钱不会显示为负数
                         updateStatsDisplay(); // 这里需要再次更新显示
                         stopPlayback();
@@ -894,9 +975,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 检查是否达到播放上限
                 if (playCounter >= PLAY_LIMIT) {
                     stopPlayback();
-                    showGameOverMessage("恭喜你度过了60天！");
+                    // 游戏正常完成，只显示结算界面
+                    showSettlementScreen(false);
                     return;
                 }
+                
+                // 检查是否需要显示结算界面
+                // if (checkSettlementCondition()) {
+                //     stopPlayback();
+                //     showSettlementScreen(false);
+                //     return;
+                // }
             }
         } catch (error) {
             console.error('动画播放头错误:', error);
@@ -919,6 +1008,12 @@ document.addEventListener('DOMContentLoaded', () => {
         activeCells.forEach(cell => {
             const actionId = cell.getAttribute('data-action');
             if (actionId && noteData[actionId] && noteData[actionId][column]) {
+                // 更新该行动的触发次数
+                if (!actionTriggerCounts[actionId]) {
+                    actionTriggerCounts[actionId] = 0;
+                }
+                actionTriggerCounts[actionId]++;
+                
                 // 触发声音和属性更新
                 playSound(actionId, true);
                 
@@ -973,10 +1068,11 @@ document.addEventListener('DOMContentLoaded', () => {
             noteData[action] = {};
         });
         
-        // 重置行动列表到初始状态（只保留工作和吃饭）
+        // 重置行动列表到初始状态（只保留工作、吃饭、刷手机）
         addedActions.length = 0;
         addedActions.push({ id: '工作', name: '工作' });
         addedActions.push({ id: '吃饭', name: '吃饭' });
+        addedActions.push({ id: '刷手机', name: '刷手机' });
         
         // 重新初始化按钮
         initTrackButtons();
@@ -992,6 +1088,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 更新解锁按钮状态
         updateUnlockButtonState();
+        
+        // 重置行动触发次数
+        Object.keys(actionTriggerCounts).forEach(key => {
+            actionTriggerCounts[key] = 0;
+        });
     }
     
     // 更新行动按钮样式
@@ -1174,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 显示欲望消费提示信息（放在欲望进度条下方）
+    // 显示欲望消费提示信息（放在界面顶部居中位置）
     function showDesireConsumptionMessage(amount) {
         // 先删除可能存在的旧消息
         const oldMessages = document.querySelectorAll('.desire-consumption-message');
@@ -1184,46 +1285,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // 获取欲望进度条的位置
-        const desireStat = document.querySelector('.desire-stat');
-        if (!desireStat) {
-            console.warn('找不到欲望进度条元素');
-            return;
-        }
-        
-        // 获取主要属性行容器
-        const primaryStats = document.querySelector('.primary-stats');
-        if (!primaryStats) {
-            console.warn('找不到主要属性行容器');
-            return;
-        }
-        
         // 创建消息元素
         const message = document.createElement('div');
         message.className = 'desire-consumption-message';
-        message.innerHTML = `欲望消费了${amount}金钱`;
+        message.innerHTML = `你冲动消费了${amount}金钱`;
         
-        // 设置样式为明显可见的文本
+        // 设置样式为明显可见的文本 - 置于顶部居中
         message.style.display = 'inline-block';
         message.style.color = '#ff5252';
         message.style.backgroundColor = 'rgba(255, 82, 82, 0.1)';
         message.style.border = '1px solid #ff5252';
         message.style.borderRadius = '3px';
-        message.style.fontSize = '12px';
+        message.style.fontSize = '14px';
         message.style.fontWeight = 'bold';
-        message.style.padding = '2px 5px';
-        message.style.marginTop = '4px';
-        message.style.marginLeft = '8px';
-        message.style.position = 'absolute';
-        message.style.zIndex = '100';
+        message.style.padding = '4px 10px';
+        message.style.position = 'fixed';
+        message.style.top = '8px';
+        message.style.left = '50%';
+        message.style.transform = 'translateX(-50%)';
+        message.style.zIndex = '1000';
+        message.style.boxShadow = '0 2px 8px rgba(255, 82, 82, 0.3)';
         
-        // 添加到主要属性行下方
+        // 添加到页面
         document.body.appendChild(message);
-        
-        // 计算位置：欲望属性下方
-        const desireRect = desireStat.getBoundingClientRect();
-        message.style.top = `${desireRect.bottom + 5}px`;
-        message.style.left = `${desireRect.left}px`;
         
         // 3秒后移除消息
         setTimeout(() => {
@@ -1233,30 +1317,161 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
     
+    // 添加失败信息和鼓励的话
+    const gameOverMessages = {
+        '破产': {
+            title: '你破产了...',
+            musician: 'Dr.Odd',
+            quote: '当你凝视欲望时，它并不会把钱还给你。'
+        },
+        '时间': {
+            title: '游戏结束：60天已完成',
+            musician: '系统',
+            quote: '你已经完成了60天的生活律动，希望你找到了自己的节奏。期待你的下一次演奏！'
+        },
+        '过劳': {
+            title: '过度工作导致精力耗尽',
+            musician: '系统',
+            quote: '工作固然重要，但别忘了生活的平衡。下次尝试给自己留些休息的时间吧。'
+        },
+        '无所事事': {
+            title: '缺乏行动导致生活停滞',
+            musician: '系统',
+            quote: '没有行动的生活如同静止的音乐，尝试多做些事情，为生活增添节奏和活力。'
+        }
+    };
+    
+    // 显示结算界面
+    function showSettlementScreen(isGameOver = false, gameOverType = '') {
+        // 获取结算标题元素
+        const settlementTitle = document.querySelector('.settlement-title');
+        const musicTitleLabel = document.querySelector('.music-title-label');
+        const continueButton = document.getElementById('continueButton');
+        
+        // 添加或移除游戏结束样式
+        if (isGameOver) {
+            settlementScreen.classList.add('game-over');
+        } else {
+            settlementScreen.classList.remove('game-over');
+        }
+        
+        if (isGameOver) {
+            // 游戏结束情况
+            // 获取对应的游戏结束信息
+            const gameOverInfo = gameOverMessages[gameOverType] || gameOverMessages['时间'];
+            
+            // 修改标题显示
+            settlementTitle.textContent = '游戏结束';
+            musicTitleLabel.textContent = '';
+            
+            // 更新结算界面内容为游戏结束信息
+            document.getElementById('musicTitle').textContent = gameOverInfo.title;
+            document.getElementById('musicianQuote').textContent = gameOverInfo.quote;
+            document.getElementById('musicianName').textContent = gameOverInfo.musician;
+            
+            // 修改继续按钮文本
+            continueButton.textContent = '重新开始';
+            
+            // 添加按钮点击事件
+            continueButton.onclick = () => {
+                // 重置游戏
+                resetPlayCount();
+                
+                // 清空行动触发次数
+                Object.keys(actionTriggerCounts).forEach(key => {
+                    actionTriggerCounts[key] = 0;
+                });
+                
+                // 隐藏结算界面
+                settlementScreen.style.display = 'none';
+                
+                // 显示游戏界面
+                gameContainer.style.display = 'flex';
+                
+                // 重新开始播放
+                startPlayback();
+            };
+        } else {
+            // 正常结算情况
+            // 恢复正常标题
+            settlementTitle.textContent = '幕间休整';
+            musicTitleLabel.textContent = '你的生活乐章';
+            
+            // 获取触发次数最多的行动
+            const mostTriggeredAction = getMostTriggeredAction();
+            
+            // 获取对应的音乐信息
+            const musicInfo = musicTitles[mostTriggeredAction] || defaultMusicInfo;
+            
+            // 更新结算界面内容
+            document.getElementById('musicTitle').textContent = musicInfo.title;
+            document.getElementById('musicianQuote').textContent = musicInfo.quote;
+            document.getElementById('musicianName').textContent = musicInfo.musician;
+            
+            // 根据是否达到游戏天数上限修改按钮文本和功能
+            if (playCounter >= PLAY_LIMIT) {
+                // 游戏已完成60天，显示重新开始按钮
+                continueButton.textContent = '重新开始';
+                
+                // 设置按钮点击事件为重置游戏
+                continueButton.onclick = () => {
+                    // 重置游戏
+                    resetPlayCount();
+                    
+                    // 清空行动触发次数
+                    Object.keys(actionTriggerCounts).forEach(key => {
+                        actionTriggerCounts[key] = 0;
+                    });
+                    
+                    // 隐藏结算界面
+                    settlementScreen.style.display = 'none';
+                    
+                    // 显示游戏界面
+                    gameContainer.style.display = 'flex';
+                    
+                    // 重新开始播放
+                    startPlayback();
+                };
+            } else {
+                // 游戏未结束，显示继续演奏按钮
+                continueButton.textContent = '继续演奏';
+                
+                // 设置按钮点击事件为继续游戏
+                continueButton.onclick = () => {
+                    // 隐藏结算界面
+                    settlementScreen.style.display = 'none';
+                    
+                    // 显示游戏界面
+                    gameContainer.style.display = 'flex';
+                    
+                    // 继续播放
+                    startPlayback();
+                };
+            }
+        }
+        
+        // 显示结算界面
+        settlementScreen.style.display = 'flex';
+        
+        // 隐藏游戏界面
+        gameContainer.style.display = 'none';
+    }
+    
     // 显示游戏结束信息
     function showGameOverMessage(message) {
-        // 创建一个模态对话框
-        const modal = document.createElement('div');
-        modal.className = 'game-over-modal';
-        modal.innerHTML = `
-            <div class="game-over-content">
-                <h2>游戏结束</h2>
-                <p>${message}</p>
-                <button id="restartButton">重新开始</button>
-            </div>
-        `;
+        // 根据消息内容判断游戏结束类型
+        let gameOverType = '时间';
         
-        // 添加到页面
-        document.body.appendChild(modal);
+        if (message.includes('破产') || message.includes('欲望消耗') || message.includes('金钱为0')) {
+            gameOverType = '破产';
+        } else if (message.includes('工作过度') || message.includes('过度工作')) {
+            gameOverType = '过劳';
+        } else if (message.includes('无所事事') || message.includes('行动太少')) {
+            gameOverType = '无所事事';
+        }
         
-        // 添加重新开始按钮事件
-        document.getElementById('restartButton').addEventListener('click', () => {
-            // 重置游戏
-            resetPlayCount();
-            
-            // 移除模态框
-            document.body.removeChild(modal);
-        });
+        // 显示整合的结算界面，传入游戏结束标志和类型
+        showSettlementScreen(true, gameOverType);
     }
     
     // 显示解锁提示信息（整合效率和耐心提升消息）
@@ -1267,7 +1482,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.removeChild(msg);
         });
         
-        let messageHTML = `<div>解锁了新行动!</div><div class="unlocked-action-name">${ACTION_EMOJIS[actionName] || ''} ${actionName}</div>`;
+        let messageHTML = `<div>新行动!</div><div class="unlocked-action-name">${ACTION_EMOJIS[actionName] || ''} ${actionName}</div>`;
         
         // 添加效率提升信息
         if (efficiencyIncreased) {
@@ -1478,7 +1693,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const headerTopRow = document.createElement('div');
                 headerTopRow.className = 'header-top-row';
                 
-                // 左侧区域：天数、重置和播放按钮
+                // 左侧区域：只保留天数计数
                 const leftControls = document.createElement('div');
                 leftControls.className = 'left-controls';
                 
@@ -1487,20 +1702,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 counter.className = 'counter';
                 counter.innerHTML = `天数: <span id="playCount">0</span>/<span id="playLimit">${PLAY_LIMIT}</span>`;
                 leftControls.appendChild(counter);
-                
-                // 重置按钮
-                const resetBtn = document.createElement('button');
-                resetBtn.id = 'resetButton';
-                resetBtn.className = 'control-button';
-                resetBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 10h7V3l-2.35 3.35z"/></svg>';
-                leftControls.appendChild(resetBtn);
-                
-                // 播放按钮
-                const playBtn = document.createElement('button');
-                playBtn.id = 'playButton';
-                playBtn.className = 'control-button';
-                playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
-                leftControls.appendChild(playBtn);
                 
                 // 添加到顶部行
                 headerTopRow.appendChild(leftControls);
@@ -1555,8 +1756,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 验证元素是否都被正确创建
             const criticalElements = [
-                document.getElementById('playButton'),
-                document.getElementById('resetButton'),
                 document.getElementById('playCount'),
                 document.getElementById('playLimit'),
                 document.getElementById('statsContainer')
@@ -1566,34 +1765,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('重要元素创建失败，恢复原始内容');
                 header.innerHTML = originalContent;
                 window.debugLog && window.debugLog('重构失败：某些元素无法创建');
-                return false;
-            }
-            
-            // 重新绑定事件监听器
-            const newPlayButton = document.getElementById('playButton');
-            const newResetButton = document.getElementById('resetButton');
-            
-            if (newPlayButton) {
-                newPlayButton.addEventListener('click', () => {
-                    if (isPlaying) {
-                        stopPlayback();
-                    } else {
-                        startPlayback();
-                    }
-                });
-                console.log('播放按钮事件绑定成功');
-            } else {
-                console.error('无法找到播放按钮');
-                return false;
-            }
-            
-            if (newResetButton) {
-                newResetButton.addEventListener('click', () => {
-                    resetPlayCount();
-                });
-                console.log('重置按钮事件绑定成功');
-            } else {
-                console.error('无法找到重置按钮');
                 return false;
             }
             
@@ -1664,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化预设音符
     function initPresetNotes() {
         // 工作行动音符 - 适应8列布局
-        const workColumns = [2, 3, 5, 6];
+        const workColumns = [1, 2, 4, 5];
         workColumns.forEach(col => {
             noteData['工作'][col] = true;
             // 更新UI
@@ -1682,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // 吃饭行动音符 - 适应8列布局
-        const eatColumns = [1, 4, 7];
+        const eatColumns = [3, 6];
         eatColumns.forEach(col => {
             noteData['吃饭'][col] = true;
             // 更新UI
@@ -1698,6 +1869,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell.appendChild(emojiSpan);
             }
         });
+        // 刷手机行动音符 - 适应8列布局
+        const phoneColumns = [0,7];
+        phoneColumns.forEach(col => {
+            noteData['刷手机'][col] = true;
+            // 更新UI
+            const cell = document.querySelector(`.grid-cell[data-action="刷手机"][data-column="${col}"]`);  
+            if (cell) {
+                cell.classList.add('active');
+                
+                // 添加emoji
+                const emojiSpan = document.createElement('span');
+                emojiSpan.className = 'action-emoji-cell';  
+                emojiSpan.textContent = ACTION_EMOJIS['刷手机'] || '';
+                cell.innerHTML = '';
+                cell.appendChild(emojiSpan);
+            }
+        });
+        
     }
     
     // 检查是否需要增加效率
@@ -1772,9 +1961,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startTime = audioContext.currentTime;
         lastCycleTime = startTime; // 初始化上次循环计数时间
         
-        // 更新播放按钮图标为暂停图标
-        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-        
         // 重置播放头位置到第一个节拍的左侧
         playhead.style.left = '90px';
         
@@ -1791,9 +1977,6 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelAnimationFrame(animationId);
             animationId = null;
         }
-        
-        // 更新播放按钮图标为播放图标
-        playButton.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 5v14l11-7z"/></svg>';
         
         // 重置播放头位置到第一个节拍的左侧
         playhead.style.left = '90px';
@@ -2053,5 +2236,120 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
         console.error('游戏初始化失败：', error);
         alert('游戏加载出错，请刷新页面重试');
+    }
+    
+    // 各行动类型的触发次数统计
+    const actionTriggerCounts = {};
+    
+    // 曲名和音乐家点评数据
+    const musicTitles = {
+        '工作': {
+            title: '《奋进进行曲》',
+            musician: '贝多芬',
+            quote: '每一个努力的音符都是对时光的尊重，这首曲子展现了生活的韧性与坚持不懈的力量。'
+        },
+        '吃饭': {
+            title: '《味觉交响曲》',
+            musician: '莫扎特',
+            quote: '生命需要滋养，正如音乐需要旋律。这种轻快的节奏让人想起了生活中的简单幸福。'
+        },
+        '阅读': {
+            title: '《知识的回响》',
+            musician: '巴赫',
+            quote: '书中的智慧如同复调音乐，层层叠加，在心灵中形成和谐的共鸣，引领我们超越自我。'
+        },
+        '听歌': {
+            title: '《音乐中的音乐》',
+            musician: '德彪西',
+            quote: '聆听是一种艺术，这首曲子捕捉了那微妙的心灵震颤，每个音符都是对另一个世界的窥探。'
+        },
+        '看剧': {
+            title: '《戏剧变奏曲》',
+            musician: '柴可夫斯基',
+            quote: '故事的起伏如同激情的乐章，在你的生活中编织出一幅色彩斑斓的情感画卷。'
+        },
+        '玩游戏': {
+            title: '《欢愉奏鸣曲》',
+            musician: '海顿',
+            quote: '游戏的本质是创造性的探索，就像这首曲子充满了俏皮的音符和意外的转折，令人忍俊不禁。'
+        },
+        '聊天': {
+            title: '《对话即兴曲》',
+            musician: '舒曼',
+            quote: '交流的艺术在于倾听与表达的平衡，这首曲子捕捉了那种自然流动的情感交织。'
+        },
+        '运动': {
+            title: '《活力狂想曲》',
+            musician: '李斯特',
+            quote: '身体的韵律是最原始的音乐，这种充满动感的节奏仿佛能唤醒灵魂深处的生命力。'
+        },
+        '创作': {
+            title: '《创造者的梦》',
+            musician: '肖邦',
+            quote: '每一次创作都是灵感与技艺的完美结合，这首曲子展现了思想的流淌与迸发的瞬间。'
+        },
+        '学习': {
+            title: '《求知圆舞曲》',
+            musician: '勃拉姆斯',
+            quote: '学习是一场永不停息的舞蹈，每一步都通向新的高度，就像这首曲子中的每一个旋律。'
+        },
+        '刷手机': {
+            title: '《数字摇篮曲》',
+            musician: '德沃夏克',
+            quote: '现代生活的节奏在指尖流转，这首曲子捕捉了那种微妙的连接与短暂的宁静。'
+        },
+        '上厕所': {
+            title: '《冥想小夜曲》',
+            musician: '拉威尔',
+            quote: '最朴素的时刻往往蕴含深刻的思考，这首曲子中的静谧让人找到内心的片刻宁静。'
+        },
+        '闲逛': {
+            title: '《漫步随想曲》',
+            musician: '舒伯特',
+            quote: '漫无目的的行走是灵魂的自由表达，这首曲子的流动感如同思绪在城市或乡间的闲适徜徉。'
+        },
+        '炒股': {
+            title: '《市场波动奏鸣曲》',
+            musician: '斯特拉文斯基',
+            quote: '金融的不确定性如同我的现代音乐，充满了张力与意外，但其中蕴含着深刻的秩序规律。'
+        },
+        '发呆': {
+            title: '《冥想前奏曲》',
+            musician: '萨蒂',
+            quote: '出神的时刻是灵感的温床，这首曲子的简约与重复创造了一种超越时间的空灵状态。'
+        },
+        '睡觉': {
+            title: '《梦境协奏曲》',
+            musician: '马勒',
+            quote: '睡眠是生命的神秘仪式，这首曲子带我们进入潜意识的海洋，在那里时间失去了意义。'
+        }
+    };
+    
+    // 默认的音乐家点评（如果找不到对应行动的点评）
+    const defaultMusicInfo = {
+        title: '《生活律动》',
+        musician: '巴赫',
+        quote: '生活如音乐，需要不同的节奏、音符和停顿，才能构成一首完美的交响乐。'
+    };
+    
+    // 获取触发次数最多的行动
+    function getMostTriggeredAction() {
+        let maxCount = 0;
+        let mostTriggeredAction = null;
+        
+        Object.entries(actionTriggerCounts).forEach(([action, count]) => {
+            if (count > maxCount) {
+                maxCount = count;
+                mostTriggeredAction = action;
+            }
+        });
+        
+        return mostTriggeredAction || ACTION_TYPES[0]; // 默认返回第一个行动类型
+    }
+    
+    // 修改结算条件，只在游戏完全结束时显示结算界面
+    function checkSettlementCondition() {
+        // 只在游戏完成60天时显示结算界面
+        return playCounter >= PLAY_LIMIT;
     }
 }); 
