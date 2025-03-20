@@ -1532,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showEfficiencyLimitMessage(column, efficiency) {
         const message = document.createElement('div');
         message.className = 'efficiency-limit-message';
-        message.innerHTML = `效率限制：每个节拍最多${efficiency}个行动`;
+        message.innerHTML = `效率不够：每列最多${efficiency}个行动`;
         message.style.position = 'fixed';
         message.style.top = '50%';
         message.style.left = '50%';
@@ -1575,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showPatienceLimitMessage(action, patience) {
         const message = document.createElement('div');
         message.className = 'patience-limit-message';
-        message.innerHTML = `耐心限制：${action}最多连续激活${patience}个节拍`;
+        message.innerHTML = `耐心不够：每行最多连续${patience}个行动`;
         message.style.position = 'fixed';
         message.style.top = '50%';
         message.style.left = '50%';
