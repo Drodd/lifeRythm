@@ -15,6 +15,15 @@
                 <div id="loading-progress-bar" class="loading-progress-bar"></div>
             </div>
             <div id="loading-status">准备加载音频文件...</div>
+            
+            <!-- 手动上传音频包 -->
+            <div class="manual-upload" style="margin-top: 20px; text-align: center;">
+                <p style="font-size: 14px; margin-bottom: 10px;">如果自动加载失败，您可以手动上传音频包：</p>
+                <input type="file" id="zipFileInput" accept=".zip" style="display: none;">
+                <button id="uploadZipButton" style="padding: 8px 16px; background: #4a5568; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                    手动上传sounds.zip
+                </button>
+            </div>
         </div>
     </div>
     

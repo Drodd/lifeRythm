@@ -795,6 +795,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             updateLoadingStatus(`开始加载音频文件包...`, baseProgress);
             
+            // 设置手动上传按钮事件
+            setupManualZipUpload(audioFiles);
+            
             try {
                 // 尝试从ZIP文件加载所有音频
                 const result = await loadAudioFromZip(audioFiles);
@@ -808,6 +811,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (zipError) {
                 console.error('从ZIP文件加载音频失败:', zipError);
                 window.debugLog && window.debugLog(`ZIP加载失败: ${zipError.message}`);
+                
+                // 显示手动上传提示
+                const uploadButton = document.getElementById('uploadZipButton');
+                if (uploadButton) {
+                    uploadButton.style.backgroundColor = '#e53e3e';
+                    uploadButton.textContent = '自动加载失败，点击上传sounds.zip';
+                }
                 
                 // 如果ZIP加载失败，回退到生成备用音效
                 console.log('ZIP加载失败，使用备用音效系统');
@@ -863,95 +873,338 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 设置手动上传ZIP文件
+    function setupManualZipUpload(audioFiles) {
+        const uploadButton = document.getElementById('uploadZipButton');
+        const fileInput = document.getElementById('zipFileInput');
+        
+        if (!uploadButton || !fileInput) {
+            console.warn('手动上传按钮或文件输入框不存在');
+            return;
+        }
+        
+        // 点击按钮触发文件选择
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // 处理文件选择
+        fileInput.addEventListener('change', async (event) => {
+            if (event.target.files.length === 0) return;
+            
+            const file = event.target.files[0];
+            console.log(`选择了文件: ${file.name}, 大小: ${(file.size / 1024).toFixed(2)} KB`);
+            window.debugLog && window.debugLog(`选择了文件: ${file.name}`);
+            
+            // 检查是否为ZIP文件
+            if (!file.name.toLowerCase().endsWith('.zip')) {
+                alert('请选择ZIP格式的音频包文件！');
+                return;
+            }
+            
+            try {
+                updateLoadingStatus('正在处理上传的ZIP文件...', 20);
+                
+                // 读取文件
+                const fileData = await readFileAsArrayBuffer(file);
+                console.log(`文件读取完成，大小: ${fileData.byteLength} 字节`);
+                
+                // 使用JSZip处理文件
+                if (typeof JSZip === 'undefined') {
+                    throw new Error('JSZip库未加载，无法解压文件');
+                }
+                
+                updateLoadingStatus('正在解压ZIP文件...', 40);
+                const zip = await JSZip.loadAsync(fileData);
+                
+                // 处理ZIP文件内容
+                const fileCount = Object.keys(zip.files).length;
+                console.log(`ZIP文件解压成功，包含 ${fileCount} 个文件`);
+                window.debugLog && window.debugLog(`解压成功，${fileCount} 个文件`);
+                
+                // 列出所有文件
+                const fileList = Object.keys(zip.files).join(', ');
+                console.log(`ZIP内文件列表: ${fileList}`);
+                
+                updateLoadingStatus('开始处理音频文件...', 60);
+                
+                // 处理所有音频文件
+                let loadedCount = 0;
+                const totalFiles = audioFiles.length;
+                
+                for (const audioFile of audioFiles) {
+                    const filename = `${audioFile.filename}.mp3`;
+                    console.log(`查找文件: ${filename}`);
+                    
+                    // 尝试在ZIP中查找文件
+                    const zipEntry = zip.file(filename);
+                    
+                    // 如果找不到完整文件名，尝试查找不带前缀的文件名
+                    const simpleName = filename.replace('snd_', '');
+                    const altEntry = zipEntry || zip.file(simpleName);
+                    
+                    if (altEntry) {
+                        try {
+                            // 从ZIP提取文件
+                            const arrayBuffer = await altEntry.async('arraybuffer');
+                            console.log(`提取 ${altEntry.name} 成功, 大小: ${arrayBuffer.byteLength} 字节`);
+                            
+                            // 解码音频
+                            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                            console.log(`解码音频成功, 时长: ${audioBuffer.duration}秒`);
+                            
+                            // 保存到缓冲区
+                            audioBuffers[audioFile.id] = audioBuffer;
+                            loadedCount++;
+                            
+                            // 更新进度
+                            const progress = 60 + (loadedCount / totalFiles) * 35;
+                            updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
+                        } catch (error) {
+                            console.error(`处理音频文件 ${altEntry.name} 失败:`, error);
+                            
+                            // 生成备用音效
+                            if (audioFile.id === 'base_rhythm') {
+                                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                            } else {
+                                const buffer = await generateSound(audioFile.id);
+                                audioBuffers[audioFile.id] = buffer;
+                            }
+                        }
+                    } else {
+                        console.warn(`ZIP中未找到文件: ${filename} 或 ${simpleName}`);
+                        
+                        // 生成备用音效
+                        if (audioFile.id === 'base_rhythm') {
+                            audioBuffers['base_rhythm'] = createEmptyBuffer();
+                        } else {
+                            const buffer = await generateSound(audioFile.id);
+                            audioBuffers[audioFile.id] = buffer;
+                        }
+                    }
+                }
+                
+                if (loadedCount > 0) {
+                    console.log(`从上传的ZIP加载音频完成: 成功 ${loadedCount}/${totalFiles} 个`);
+                    updateLoadingStatus(`音频加载完成: 成功 ${loadedCount}/${totalFiles} 个`, 95);
+                    
+                    // 标记音频初始化完成
+                    audioInitialized = true;
+                    
+                    // 隐藏加载屏幕并开始游戏
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.style.display = 'none';
+                    }
+                    
+                    // 启动游戏
+                    startGame();
+                } else {
+                    updateLoadingStatus('未能从ZIP加载任何音频文件，使用备用音效', 50);
+                    
+                    // 生成所有备用音效
+                    for (const action of ACTION_TYPES) {
+                        const buffer = await generateSound(action);
+                        audioBuffers[action] = buffer;
+                    }
+                    
+                    audioBuffers['base_rhythm'] = createEmptyBuffer();
+                    audioInitialized = true;
+                    
+                    // 隐藏加载屏幕并开始游戏
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.style.display = 'none';
+                    }
+                    
+                    // 启动游戏
+                    startGame();
+                }
+            } catch (error) {
+                console.error('处理上传的ZIP文件失败:', error);
+                updateLoadingStatus(`处理ZIP文件失败: ${error.message}`, 20);
+            }
+        });
+    }
+
+    // 将文件读取为ArrayBuffer
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+                resolve(event.target.result);
+            };
+            
+            reader.onerror = (error) => {
+                reject(error);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
     // 从ZIP文件加载所有音频
     async function loadAudioFromZip(audioFiles) {
         try {
+            // 在界面上显示详细日志
+            const showDetailedStatus = (msg) => {
+                console.log(msg);
+                window.debugLog && window.debugLog(msg);
+                updateLoadingStatus(msg, null); // 只更新消息，不更新进度
+            };
+
             // 下载ZIP文件
-            console.log('开始下载音频ZIP包');
-            window.debugLog && window.debugLog('开始下载音频ZIP包');
+            showDetailedStatus('开始下载音频ZIP包...');
             updateLoadingStatus('下载音频包...', 20);
             
-            const zipResponse = await fetch('sounds.zip');
-            if (!zipResponse.ok) {
-                throw new Error(`下载ZIP失败: ${zipResponse.status}`);
-            }
+            // 确保URL正确
+            const zipUrl = 'sounds.zip';
+            showDetailedStatus(`正在从 ${window.location.href}${zipUrl} 下载音频包`);
             
-            // 获取ZIP文件数据
-            const zipData = await zipResponse.arrayBuffer();
-            console.log(`ZIP文件下载完成，大小: ${zipData.byteLength} 字节`);
-            window.debugLog && window.debugLog(`ZIP文件下载完成: ${(zipData.byteLength / 1024).toFixed(2)}KB`);
-            updateLoadingStatus('解压音频文件...', 40);
-            
-            // 加载JSZip库，如果尚未加载
-            if (typeof JSZip === 'undefined') {
-                throw new Error('JSZip库未加载，无法解压文件');
-            }
-            
-            // 解压ZIP文件
-            const zip = await JSZip.loadAsync(zipData);
-            console.log('ZIP文件解压成功，开始处理音频文件');
-            window.debugLog && window.debugLog('ZIP文件解压成功');
-            updateLoadingStatus('处理音频文件...', 60);
-            
-            // 处理所有音频文件
-            let loadedCount = 0;
-            const totalFiles = audioFiles.length;
-            
-            for (const file of audioFiles) {
-                const zipFilename = `${file.filename}.mp3`;
-                const zipEntry = zip.file(zipFilename);
+            try {
+                const zipResponse = await fetch(zipUrl);
                 
-                if (!zipEntry) {
-                    console.warn(`ZIP中未找到文件: ${zipFilename}`);
-                    window.debugLog && window.debugLog(`ZIP中未找到: ${zipFilename}`);
-                    
-                    // 如果是base_rhythm，创建空缓冲区
-                    if (file.id === 'base_rhythm') {
-                        audioBuffers['base_rhythm'] = createEmptyBuffer();
-                    } else {
-                        // 为缺失的音频创建备用音效
-                        const buffer = await generateSound(file.id);
-                        audioBuffers[file.id] = buffer;
-                    }
-                    continue;
+                showDetailedStatus(`ZIP响应状态: ${zipResponse.status} ${zipResponse.statusText}`);
+                
+                if (!zipResponse.ok) {
+                    throw new Error(`下载ZIP失败: HTTP ${zipResponse.status} - ${zipResponse.statusText}`);
                 }
                 
+                // 获取ZIP文件数据
+                showDetailedStatus('开始读取ZIP数据...');
+                const zipData = await zipResponse.arrayBuffer();
+                const zipSizeKB = (zipData.byteLength / 1024).toFixed(2);
+                showDetailedStatus(`ZIP文件下载完成，大小: ${zipSizeKB} KB`);
+                updateLoadingStatus(`ZIP下载完成 (${zipSizeKB} KB)，准备解压...`, 40);
+                
+                // 检查JSZip库是否加载
+                if (typeof JSZip === 'undefined') {
+                    showDetailedStatus('错误: JSZip库未加载！请检查网络连接和控制台错误。');
+                    throw new Error('JSZip库未加载，无法解压文件');
+                }
+                
+                showDetailedStatus('JSZip库已加载，开始解压...');
+                
+                // 解压ZIP文件
                 try {
-                    // 从ZIP中提取文件
-                    const arrayBuffer = await zipEntry.async('arraybuffer');
-                    console.log(`从ZIP中提取 ${zipFilename}, 大小: ${arrayBuffer.byteLength} 字节`);
+                    const zip = await JSZip.loadAsync(zipData);
+                    const fileCount = Object.keys(zip.files).length;
+                    showDetailedStatus(`ZIP文件解压成功，包含 ${fileCount} 个文件`);
                     
-                    // 解码音频数据
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    console.log(`解码音频 ${zipFilename} 成功, 时长: ${audioBuffer.duration}秒`);
+                    // 列出ZIP内的所有文件
+                    const fileList = Object.keys(zip.files).join(', ');
+                    showDetailedStatus(`ZIP内文件列表: ${fileList}`);
                     
-                    // 保存音频缓冲区
-                    audioBuffers[file.id] = audioBuffer;
-                    loadedCount++;
+                    updateLoadingStatus('开始处理音频文件...', 60);
                     
-                    // 更新加载进度
-                    const progress = 60 + (loadedCount / totalFiles) * 35;
-                    updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
-                } catch (error) {
-                    console.error(`处理音频 ${zipFilename} 失败:`, error);
-                    window.debugLog && window.debugLog(`处理音频失败: ${zipFilename}`);
+                    // 处理所有音频文件
+                    let loadedCount = 0;
+                    const totalFiles = audioFiles.length;
                     
-                    // 为错误音频创建备用音效
-                    if (file.id === 'base_rhythm') {
-                        audioBuffers['base_rhythm'] = createEmptyBuffer();
-                    } else {
-                        const buffer = await generateSound(file.id);
-                        audioBuffers[file.id] = buffer;
+                    for (const file of audioFiles) {
+                        const zipFilename = `${file.filename}.mp3`;
+                        showDetailedStatus(`查找文件: ${zipFilename}`);
+                        
+                        const zipEntry = zip.file(zipFilename);
+                        
+                        if (!zipEntry) {
+                            showDetailedStatus(`警告: ZIP中未找到文件: ${zipFilename}`);
+                            
+                            // 检查是否有不带前缀的文件名
+                            const simpleName = zipFilename.replace('snd_', '');
+                            const altEntry = zip.file(simpleName);
+                            
+                            if (altEntry) {
+                                showDetailedStatus(`找到替代文件: ${simpleName}`);
+                                
+                                try {
+                                    const arrayBuffer = await altEntry.async('arraybuffer');
+                                    showDetailedStatus(`从ZIP中提取 ${simpleName}, 大小: ${arrayBuffer.byteLength} 字节`);
+                                    
+                                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                                    showDetailedStatus(`解码音频 ${simpleName} 成功, 时长: ${audioBuffer.duration}秒`);
+                                    
+                                    audioBuffers[file.id] = audioBuffer;
+                                    loadedCount++;
+                                    
+                                    // 更新加载进度
+                                    const progress = 60 + (loadedCount / totalFiles) * 35;
+                                    updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
+                                    continue;
+                                } catch (err) {
+                                    showDetailedStatus(`处理替代文件 ${simpleName} 失败: ${err.message}`);
+                                }
+                            }
+                            
+                            // 如果是base_rhythm，创建空缓冲区
+                            if (file.id === 'base_rhythm') {
+                                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                                showDetailedStatus('使用空白音频作为基础节奏');
+                            } else {
+                                // 为缺失的音频创建备用音效
+                                showDetailedStatus(`为行动 ${file.id} 生成备用音效`);
+                                const buffer = await generateSound(file.id);
+                                audioBuffers[file.id] = buffer;
+                            }
+                            continue;
+                        }
+                        
+                        try {
+                            // 从ZIP中提取文件
+                            showDetailedStatus(`开始提取: ${zipFilename}`);
+                            const arrayBuffer = await zipEntry.async('arraybuffer');
+                            showDetailedStatus(`提取 ${zipFilename} 成功, 大小: ${arrayBuffer.byteLength} 字节`);
+                            
+                            // 解码音频数据
+                            showDetailedStatus(`开始解码: ${zipFilename}`);
+                            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                            showDetailedStatus(`解码 ${zipFilename} 成功, 时长: ${audioBuffer.duration}秒`);
+                            
+                            // 保存音频缓冲区
+                            audioBuffers[file.id] = audioBuffer;
+                            loadedCount++;
+                            
+                            // 更新加载进度
+                            const progress = 60 + (loadedCount / totalFiles) * 35;
+                            updateLoadingStatus(`已处理 ${loadedCount}/${totalFiles} 个音频文件`, progress);
+                        } catch (error) {
+                            showDetailedStatus(`处理音频 ${zipFilename} 失败: ${error.message}`);
+                            
+                            // 为错误音频创建备用音效
+                            if (file.id === 'base_rhythm') {
+                                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                                showDetailedStatus('使用空白音频作为基础节奏');
+                            } else {
+                                showDetailedStatus(`为行动 ${file.id} 生成备用音效`);
+                                const buffer = await generateSound(file.id);
+                                audioBuffers[file.id] = buffer;
+                            }
+                        }
                     }
+                    
+                    // 检查是否成功加载了至少一个文件
+                    if (loadedCount > 0) {
+                        showDetailedStatus(`成功从ZIP加载了 ${loadedCount}/${totalFiles} 个音频文件`);
+                        return true;
+                    } else {
+                        showDetailedStatus('未能从ZIP加载任何音频文件，使用备用音效');
+                        throw new Error('未能从ZIP加载任何音频文件');
+                    }
+                } catch (zipLoadError) {
+                    showDetailedStatus(`解压或处理ZIP文件时出错: ${zipLoadError.message}`);
+                    throw zipLoadError;
                 }
+            } catch (fetchError) {
+                showDetailedStatus(`下载ZIP文件时出错: ${fetchError.message}`);
+                throw fetchError;
             }
-            
-            console.log(`从ZIP加载音频完成: 成功 ${loadedCount}/${totalFiles} 个`);
-            window.debugLog && window.debugLog(`从ZIP加载: 成功 ${loadedCount}/${totalFiles}`);
-            return true;
         } catch (error) {
             console.error('从ZIP加载音频失败:', error);
             window.debugLog && window.debugLog(`ZIP加载失败: ${error.message}`);
+            // 保持错误信息可见更长时间
+            updateLoadingStatus(`音频ZIP加载失败: ${error.message}`, 40);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 显示错误3秒
             throw error;
         }
     }
@@ -3403,17 +3656,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 更新加载状态
     function updateLoadingStatus(message, progress) {
-        // 更新加载进度条
-        if (loadingProgressBar) {
-            loadingProgressBar.style.width = `${progress}%`;
-        }
+        const loadingStatus = document.getElementById('loading-status');
+        const progressBar = document.getElementById('loading-progress-bar');
         
-        // 更新加载状态文本
         if (loadingStatus) {
             loadingStatus.textContent = message;
         }
         
-        console.log(`加载进度 ${progress}%: ${message}`);
+        if (progressBar && progress !== null) {
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        console.log(`加载进度 ${progress !== null ? progress + '%' : ''}${progress !== null ? ': ' : ''}${message}`);
     }
 
     // 检测是否为移动设备
