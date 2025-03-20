@@ -687,40 +687,193 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 初始化音频
     async function initAudio() {
-        if (audioInitialized) return; // 已初始化则直接返回
+        if (audioInitialized) {
+            console.log('音频已经初始化，跳过初始化过程');
+            return;
+        }
+        
+        console.log('开始初始化音频...');
+        window.debugLog && window.debugLog('开始初始化音频...');
         
         try {
             // 创建音频上下文
             if (!audioContext) {
+                console.log('创建新的音频上下文');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
                 // 监听音频上下文状态变化
                 audioContext.onstatechange = () => {
                     console.log('音频上下文状态变化:', audioContext.state);
+                    window.debugLog && window.debugLog(`音频上下文状态: ${audioContext.state}`);
                 };
             }
             
-            // 使用简单的音频生成替代真实音频文件
+            console.log('ACTION_TYPES:', ACTION_TYPES);
+            
+            // 使用mp3音频文件替代合成声音
             const promises = [];
+            let loadSuccessCount = 0;
+            let loadFailCount = 0;
+            
+            // 添加基础节奏音频
+            console.log('尝试加载基础节奏音频');
+            promises.push(loadSound('base_rythm').then(buffer => {
+                audioBuffers['base_rhythm'] = buffer;
+                loadSuccessCount++;
+                console.log('基础节奏音频加载成功');
+            }).catch(error => {
+                loadFailCount++;
+                console.warn('基础节奏音频加载失败，使用备用音效');
+                // 如果基础节奏加载失败，创建一个空白的音频作为替代
+                const buffer = createEmptyBuffer();
+                audioBuffers['base_rhythm'] = buffer;
+                return buffer;
+            }));
+            
+            // 加载所有行动对应的mp3文件
             for (const action of ACTION_TYPES) {
-                promises.push(generateSound(action).then(buffer => {
+                const soundFileName = `snd_${actionToFileName(action)}`;
+                console.log(`准备加载行动音效: ${action} -> ${soundFileName}`);
+                
+                promises.push(loadSound(soundFileName).then(buffer => {
+                    console.log(`行动 ${action} 的音效加载成功`);
                     audioBuffers[action] = buffer;
+                    loadSuccessCount++;
+                }).catch(error => {
+                    loadFailCount++;
+                    console.warn(`无法加载音频 ${soundFileName}，使用备用音效`, error);
+                    window.debugLog && window.debugLog(`无法加载 ${soundFileName}.mp3，使用备用音效`);
+                    
+                    // 如果特定行动的音频加载失败，使用生成的备用音效
+                    return generateSound(action).then(buffer => {
+                        console.log(`为行动 ${action} 生成备用音效`);
+                        audioBuffers[action] = buffer;
+                        return buffer;
+                    });
                 }));
             }
             
-            // 等待所有音频生成完成
+            // 等待所有音频加载完成
             await Promise.all(promises);
             
-            console.log('音频初始化完成');
-            audioInitialized = true; // 标记音频已初始化
+            console.log(`音频加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`);
+            window.debugLog && window.debugLog(`音频加载: 成功 ${loadSuccessCount}, 失败 ${loadFailCount}`);
+            
+            // 列出所有加载的音频
+            console.log('已加载的音频缓冲区:', Object.keys(audioBuffers));
+            
+            // 即使部分加载失败也标记为初始化完成
+            audioInitialized = true;
             return true;
         } catch (error) {
             console.error('初始化音频失败:', error);
-            return false;
+            window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
+            
+            // 初始化备用音效
+            console.log('使用备用音效系统');
+            window.debugLog && window.debugLog('使用备用音效系统');
+            
+            try {
+                // 为所有行动生成备用音效
+                for (const action of ACTION_TYPES) {
+                    const buffer = await generateSound(action);
+                    audioBuffers[action] = buffer;
+                }
+                
+                // 创建一个空白的背景节奏
+                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                
+                // 标记为初始化完成
+                audioInitialized = true;
+                return true;
+            } catch (fallbackError) {
+                console.error('备用音效也初始化失败:', fallbackError);
+                window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
+                return false;
+            }
         }
     }
+
+    // 创建空白的音频缓冲区
+    function createEmptyBuffer() {
+        const sampleRate = audioContext.sampleRate;
+        const duration = 0.1; // 很短的声音
+        const frameCount = sampleRate * duration;
+        
+        const audioBuffer = audioContext.createBuffer(1, frameCount, sampleRate);
+        const channelData = audioBuffer.getChannelData(0);
+        
+        // 填充静音数据
+        for (let i = 0; i < frameCount; i++) {
+            channelData[i] = 0;
+        }
+        
+        return audioBuffer;
+    }
     
-    // 生成简单的合成声音 (保留原有音效逻辑，但将类型映射到行动)
+    // 加载音频文件的函数
+    function loadSound(filename) {
+        console.log(`尝试加载音频: ${filename}.mp3`);
+        
+        // 获取当前页面URL的路径部分
+        const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+        const relativeUrl = `sounds/${filename}.mp3`;
+        const absoluteUrl = new URL(relativeUrl, baseUrl).href;
+        
+        console.log(`音频文件相对URL: ${relativeUrl}`);
+        console.log(`音频文件绝对URL: ${absoluteUrl}`);
+        
+        return new Promise((resolve, reject) => {
+            // 检查文件是否存在
+            fetch(absoluteUrl)
+                .then(response => {
+                    console.log(`音频文件 ${filename}.mp3 响应状态:`, response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误! 状态: ${response.status}`);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    console.log(`音频文件 ${filename}.mp3 成功获取为ArrayBuffer, 大小: ${arrayBuffer.byteLength} 字节`);
+                    return audioContext.decodeAudioData(arrayBuffer);
+                })
+                .then(audioBuffer => {
+                    console.log(`音频文件 ${filename}.mp3 成功解码为AudioBuffer, 时长: ${audioBuffer.duration}秒`);
+                    resolve(audioBuffer);
+                })
+                .catch(error => {
+                    console.error(`加载音频${filename}失败:`, error);
+                    window.debugLog && window.debugLog(`音频加载失败: ${filename}.mp3`);
+                    reject(error);
+                });
+        });
+    }
+    
+    // 将行动名称转换为文件名
+    function actionToFileName(action) {
+        const actionMap = {
+            '工作': 'work',
+            '吃饭': 'eat',
+            '阅读': 'read',
+            '听歌': 'music',
+            '看剧': 'drama',
+            '玩游戏': 'game',
+            '聊天': 'chat',
+            '运动': 'sport',
+            '创作': 'create',
+            '学习': 'study',
+            '刷手机': 'phone',
+            '上厕所': 'toilet',
+            '闲逛': 'walk',
+            '炒股': 'stock',
+            '发呆': 'daydreaming',
+            '睡觉': 'daydreaming' // 暂时用发呆的音效代替睡觉
+        };
+        
+        return actionMap[action] || action.toLowerCase();
+    }
+    
+    // 生成简单的合成声音 (作为备用音效)
     function generateSound(action) {
         return new Promise((resolve) => {
             const sampleRate = audioContext.sampleRate;
@@ -814,19 +967,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            // 创建音频源
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffers[actionId];
             
             // 创建增益节点控制音量
             const gainNode = audioContext.createGain();
-            gainNode.gain.value = 0.5;
+            
+            // 动态调整音量以避免叠加播放时的爆音
+            // 计算当前正在播放的同类型音效数量
+            const activeSoundCount = getActiveSoundsCount(actionId);
+            
+            // 根据当前活跃的同类型音效数量调整音量
+            // 音效越多，单个音效音量越小，但总音量略有增加感
+            const volumeScale = Math.max(0.1, 0.5 / Math.sqrt(activeSoundCount + 1));
+            gainNode.gain.value = volumeScale;
             
             // 连接音频节点
             source.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
+            // 跟踪正在播放的声音
+            trackActiveSound(actionId, source, gainNode);
+            
             // 播放音频
             source.start(0);
+            
+            // 当声音播放结束时，从活跃声音列表中移除
+            source.onended = () => {
+                removeActiveSound(actionId, source);
+            };
             
             // 如果需要，更新玩家属性
             if (updateStats) {
@@ -877,6 +1047,61 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('播放声音错误:', error);
         }
+    }
+    
+    // 跟踪活跃的声音对象
+    const activeSounds = {};
+    
+    // 跟踪正在播放的声音
+    function trackActiveSound(actionId, source, gainNode) {
+        if (!activeSounds[actionId]) {
+            activeSounds[actionId] = [];
+        }
+        activeSounds[actionId].push({ source, gainNode, startTime: audioContext.currentTime });
+        
+        // 调整所有活跃声音的音量以保持总音量在合理范围
+        adjustActiveSoundsVolume(actionId);
+    }
+    
+    // 从活跃声音列表中移除
+    function removeActiveSound(actionId, source) {
+        if (activeSounds[actionId]) {
+            const index = activeSounds[actionId].findIndex(sound => sound.source === source);
+            if (index !== -1) {
+                activeSounds[actionId].splice(index, 1);
+                
+                // 如果没有活跃声音了，清理数组
+                if (activeSounds[actionId].length === 0) {
+                    delete activeSounds[actionId];
+                } else {
+                    // 调整剩余声音的音量
+                    adjustActiveSoundsVolume(actionId);
+                }
+            }
+        }
+    }
+    
+    // 获取某个行动当前活跃的声音数量
+    function getActiveSoundsCount(actionId) {
+        return activeSounds[actionId] ? activeSounds[actionId].length : 0;
+    }
+    
+    // 调整所有活跃声音的音量
+    function adjustActiveSoundsVolume(actionId) {
+        if (!activeSounds[actionId]) return;
+        
+        const sounds = activeSounds[actionId];
+        const count = sounds.length;
+        
+        // 根据数量调整音量
+        sounds.forEach(sound => {
+            const elapsedTime = audioContext.currentTime - sound.startTime;
+            // 已播放超过50ms的声音不再调整音量，避免听感突变
+            if (elapsedTime < 0.05) {
+                const volumeScale = Math.max(0.1, 0.5 / Math.sqrt(count));
+                sound.gainNode.gain.value = volumeScale;
+            }
+        });
     }
     
     // 属性闪烁警告效果
@@ -1964,6 +2189,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 重置播放头位置到第一个节拍的左侧
         playhead.style.left = '90px';
         
+        // 播放背景节奏
+        playBackgroundRhythm();
+        
         // 开始动画
         animatePlayhead();
         
@@ -1977,6 +2205,9 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelAnimationFrame(animationId);
             animationId = null;
         }
+        
+        // 停止背景节奏
+        stopBackgroundRhythm();
         
         // 重置播放头位置到第一个节拍的左侧
         playhead.style.left = '90px';
@@ -2352,4 +2583,156 @@ document.addEventListener('DOMContentLoaded', () => {
         // 只在游戏完成60天时显示结算界面
         return playCounter >= PLAY_LIMIT;
     }
+
+    // 背景节奏音频源
+    let backgroundRhythmSource = null;
+    let backgroundRhythmGain = null;
+
+    // 播放背景节奏
+    function playBackgroundRhythm() {
+        // 如果已经有正在播放的背景节奏，则停止它
+        stopBackgroundRhythm();
+        
+        // 确保背景节奏音频已加载
+        if (!audioBuffers['base_rhythm']) {
+            console.warn('背景节奏音频未加载，尝试加载');
+            window.debugLog && window.debugLog('背景节奏未加载，尝试加载');
+            
+            // 尝试加载背景节奏
+            loadSound('base_rythm')
+                .then(buffer => {
+                    console.log('成功加载背景节奏');
+                    audioBuffers['base_rhythm'] = buffer;
+                    startBackgroundRhythmPlayback();
+                })
+                .catch(error => {
+                    console.error('加载背景节奏失败，使用空白音频:', error);
+                    // 使用空白音频
+                    audioBuffers['base_rhythm'] = createEmptyBuffer();
+                    startBackgroundRhythmPlayback();
+                });
+        } else {
+            startBackgroundRhythmPlayback();
+        }
+    }
+
+    // 启动背景节奏播放
+    function startBackgroundRhythmPlayback() {
+        try {
+            // 创建音频源
+            backgroundRhythmSource = audioContext.createBufferSource();
+            backgroundRhythmSource.buffer = audioBuffers['base_rhythm'];
+            backgroundRhythmSource.loop = true; // 设置循环播放
+            
+            // 创建增益节点
+            backgroundRhythmGain = audioContext.createGain();
+            backgroundRhythmGain.gain.value = 0.15; // 设置较低的音量
+            
+            // 连接音频节点
+            backgroundRhythmSource.connect(backgroundRhythmGain);
+            backgroundRhythmGain.connect(audioContext.destination);
+            
+            // 播放音频
+            backgroundRhythmSource.start(0);
+            
+            console.log('背景节奏开始播放');
+            window.debugLog && window.debugLog('背景节奏开始播放');
+        } catch (error) {
+            console.error('播放背景节奏错误:', error);
+            window.debugLog && window.debugLog(`背景节奏播放错误: ${error.message}`);
+        }
+    }
+
+    // 停止背景节奏
+    function stopBackgroundRhythm() {
+        if (backgroundRhythmSource) {
+            try {
+                backgroundRhythmSource.stop();
+            } catch (error) {
+                // 忽略已停止的音频源错误
+            }
+            backgroundRhythmSource = null;
+            backgroundRhythmGain = null;
+        }
+    }
+
+    // 测试音频加载和播放函数
+    function testAudio(action) {
+        console.log(`开始测试音频: ${action || 'all'}`);
+        window.debugLog && window.debugLog(`测试音频: ${action || 'all'}`);
+        
+        if (!audioContext) {
+            console.error('音频上下文不存在，创建新的');
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (audioContext.state === 'suspended') {
+            console.log('恢复音频上下文');
+            audioContext.resume();
+        }
+        
+        // 如果指定了特定行动，只测试那个行动的音频
+        if (action && ACTION_TYPES.includes(action)) {
+            const soundFileName = `snd_${actionToFileName(action)}`;
+            console.log(`测试单个音频: ${action} -> ${soundFileName}`);
+            
+            loadSound(soundFileName)
+                .then(buffer => {
+                    console.log(`${action}音频加载成功，尝试播放`);
+                    
+                    // 播放音频
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.start(0);
+                    
+                    // 更新缓冲区
+                    audioBuffers[action] = buffer;
+                    
+                    console.log(`${action}音频播放成功`);
+                    window.debugLog && window.debugLog(`${action}音频播放成功`);
+                })
+                .catch(error => {
+                    console.error(`${action}音频测试失败:`, error);
+                    window.debugLog && window.debugLog(`${action}音频测试失败`);
+                });
+        } 
+        // 测试基础节奏
+        else if (action === 'base_rhythm') {
+            console.log('测试基础节奏音频');
+            
+            loadSound('base_rythm')
+                .then(buffer => {
+                    console.log('基础节奏音频加载成功，尝试播放');
+                    
+                    // 播放音频
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.start(0);
+                    
+                    // 更新缓冲区
+                    audioBuffers['base_rhythm'] = buffer;
+                    
+                    console.log('基础节奏音频播放成功');
+                    window.debugLog && window.debugLog('基础节奏音频播放成功');
+                })
+                .catch(error => {
+                    console.error('基础节奏音频测试失败:', error);
+                    window.debugLog && window.debugLog('基础节奏音频测试失败');
+                });
+        }
+        // 如果没有指定行动，测试所有音频
+        else {
+            console.log('测试所有音频');
+            // 重新初始化所有音频
+            initAudio().then(() => {
+                console.log('所有音频初始化完成');
+                window.debugLog && window.debugLog('所有音频初始化完成');
+            });
+        }
+    }
+
+    // 将测试函数暴露给全局作用域，方便在控制台调用
+    window.testAudio = testAudio;
 }); 
