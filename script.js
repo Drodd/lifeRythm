@@ -710,51 +710,46 @@ document.addEventListener('DOMContentLoaded', () => {
             
             console.log('ACTION_TYPES:', ACTION_TYPES);
             
-            // 使用mp3音频文件替代合成声音
-            const promises = [];
+            // 串行加载音频文件
             let loadSuccessCount = 0;
             let loadFailCount = 0;
             
-            // 添加基础节奏音频
+            // 首先加载基础节奏音频
             console.log('尝试加载基础节奏音频');
-            promises.push(loadSound('base_rythm').then(buffer => {
-                audioBuffers['base_rhythm'] = buffer;
+            try {
+                audioBuffers['base_rhythm'] = await loadSoundWithRetry('base_rhythm', 3);
                 loadSuccessCount++;
                 console.log('基础节奏音频加载成功');
-            }).catch(error => {
+            } catch (error) {
                 loadFailCount++;
                 console.warn('基础节奏音频加载失败，使用备用音效');
-                // 如果基础节奏加载失败，创建一个空白的音频作为替代
-                const buffer = createEmptyBuffer();
-                audioBuffers['base_rhythm'] = buffer;
-                return buffer;
-            }));
+                audioBuffers['base_rhythm'] = createEmptyBuffer();
+            }
             
-            // 加载所有行动对应的mp3文件
+            // 然后依次加载每个行动的音频
             for (const action of ACTION_TYPES) {
                 const soundFileName = `snd_${actionToFileName(action)}`;
                 console.log(`准备加载行动音效: ${action} -> ${soundFileName}`);
                 
-                promises.push(loadSound(soundFileName).then(buffer => {
+                try {
+                    const buffer = await loadSoundWithRetry(soundFileName, 3);
                     console.log(`行动 ${action} 的音效加载成功`);
                     audioBuffers[action] = buffer;
                     loadSuccessCount++;
-                }).catch(error => {
+                    
+                    // 添加短暂延迟，避免并发请求过多
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
                     loadFailCount++;
                     console.warn(`无法加载音频 ${soundFileName}，使用备用音效`, error);
                     window.debugLog && window.debugLog(`无法加载 ${soundFileName}.mp3，使用备用音效`);
                     
-                    // 如果特定行动的音频加载失败，使用生成的备用音效
-                    return generateSound(action).then(buffer => {
-                        console.log(`为行动 ${action} 生成备用音效`);
-                        audioBuffers[action] = buffer;
-                        return buffer;
-                    });
-                }));
+                    // 使用生成的备用音效
+                    const buffer = await generateSound(action);
+                    console.log(`为行动 ${action} 生成备用音效`);
+                    audioBuffers[action] = buffer;
+                }
             }
-            
-            // 等待所有音频加载完成
-            await Promise.all(promises);
             
             console.log(`音频加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`);
             window.debugLog && window.debugLog(`音频加载: 成功 ${loadSuccessCount}, 失败 ${loadFailCount}`);
@@ -762,36 +757,59 @@ document.addEventListener('DOMContentLoaded', () => {
             // 列出所有加载的音频
             console.log('已加载的音频缓冲区:', Object.keys(audioBuffers));
             
-            // 即使部分加载失败也标记为初始化完成
+            // 标记为初始化完成
             audioInitialized = true;
             return true;
         } catch (error) {
             console.error('初始化音频失败:', error);
             window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
-            
-            // 初始化备用音效
-            console.log('使用备用音效系统');
-            window.debugLog && window.debugLog('使用备用音效系统');
-            
+            return false;
+        }
+    }
+
+    // 带重试机制的音频加载函数
+    async function loadSoundWithRetry(filename, maxRetries = 3) {
+        let lastError;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // 为所有行动生成备用音效
-                for (const action of ACTION_TYPES) {
-                    const buffer = await generateSound(action);
-                    audioBuffers[action] = buffer;
+                console.log(`尝试加载音频 ${filename}.mp3 (第 ${attempt} 次尝试)`);
+                window.debugLog && window.debugLog(`尝试加载音频 ${filename}.mp3 (第 ${attempt} 次)`);
+                
+                // 获取当前页面URL的路径部分
+                const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+                const relativeUrl = `sounds/${filename}.mp3`;
+                const absoluteUrl = new URL(relativeUrl, baseUrl).href;
+                
+                console.log(`音频文件URL: ${absoluteUrl}`);
+                
+                const response = await fetch(absoluteUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
                 }
                 
-                // 创建一个空白的背景节奏
-                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                const arrayBuffer = await response.arrayBuffer();
+                console.log(`音频文件 ${filename}.mp3 获取成功，大小: ${arrayBuffer.byteLength} 字节`);
                 
-                // 标记为初始化完成
-                audioInitialized = true;
-                return true;
-            } catch (fallbackError) {
-                console.error('备用音效也初始化失败:', fallbackError);
-                window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
-                return false;
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                console.log(`音频文件 ${filename}.mp3 解码成功，时长: ${audioBuffer.duration}秒`);
+                
+                return audioBuffer;
+            } catch (error) {
+                lastError = error;
+                console.warn(`加载音频 ${filename}.mp3 失败 (尝试 ${attempt}/${maxRetries}):`, error);
+                window.debugLog && window.debugLog(`加载失败 ${filename}.mp3 (尝试 ${attempt}/${maxRetries})`);
+                
+                if (attempt < maxRetries) {
+                    // 在重试之前等待一段时间，时间随重试次数增加
+                    const delay = attempt * 1000; // 1秒, 2秒, 3秒...
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
             }
         }
+        
+        // 如果所有重试都失败了，抛出最后一个错误
+        throw lastError;
     }
 
     // 创建空白的音频缓冲区
@@ -814,6 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载音频文件的函数
     function loadSound(filename) {
         console.log(`尝试加载音频: ${filename}.mp3`);
+        window.debugLog && window.debugLog(`尝试加载音频: ${filename}.mp3`);
         
         // 获取当前页面URL的路径部分
         const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
@@ -822,12 +841,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`音频文件相对URL: ${relativeUrl}`);
         console.log(`音频文件绝对URL: ${absoluteUrl}`);
+        window.debugLog && window.debugLog(`音频文件URL: ${absoluteUrl}`);
         
         return new Promise((resolve, reject) => {
             // 检查文件是否存在
             fetch(absoluteUrl)
                 .then(response => {
                     console.log(`音频文件 ${filename}.mp3 响应状态:`, response.status);
+                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 响应状态: ${response.status}`);
+                    
                     if (!response.ok) {
                         throw new Error(`HTTP错误! 状态: ${response.status}`);
                     }
@@ -835,18 +857,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .then(arrayBuffer => {
                     console.log(`音频文件 ${filename}.mp3 成功获取为ArrayBuffer, 大小: ${arrayBuffer.byteLength} 字节`);
+                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 大小: ${arrayBuffer.byteLength} 字节`);
+                    
                     return audioContext.decodeAudioData(arrayBuffer);
                 })
                 .then(audioBuffer => {
                     console.log(`音频文件 ${filename}.mp3 成功解码为AudioBuffer, 时长: ${audioBuffer.duration}秒`);
+                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 解码成功, 时长: ${audioBuffer.duration}秒`);
                     resolve(audioBuffer);
                 })
                 .catch(error => {
                     console.error(`加载音频${filename}失败:`, error);
-                    window.debugLog && window.debugLog(`音频加载失败: ${filename}.mp3`);
-                    reject(error);
+                    window.debugLog && window.debugLog(`音频加载失败: ${filename}.mp3 - ${error.message}`);
+                    
+                    // 如果是基础节奏音频加载失败，使用备用音效
+                    if (filename === 'base_rhythm') {
+                        console.log('使用空白音频作为基础节奏');
+                        const buffer = createEmptyBuffer();
+                        resolve(buffer);
+                    } else {
+                        // 对于其他音频，尝试使用备用音效
+                        const fallbackSound = getFallbackSound(filename);
+                        if (fallbackSound) {
+                            console.log(`使用备用音效: ${fallbackSound}`);
+                            loadSound(fallbackSound)
+                                .then(resolve)
+                                .catch(() => {
+                                    console.error('备用音效也加载失败，使用生成的音效');
+                                    generateSound(filename).then(resolve).catch(reject);
+                                });
+                        } else {
+                            console.error('没有可用的备用音效，使用生成的音效');
+                            generateSound(filename).then(resolve).catch(reject);
+                        }
+                    }
                 });
         });
+    }
+    
+    // 获取备用音效
+    function getFallbackSound(filename) {
+        const fallbackMap = {
+            'snd_sleep': 'snd_daydreaming',  // 睡觉使用发呆的音效
+            // 可以添加更多的备用音效映射
+        };
+        return fallbackMap[filename];
     }
     
     // 将行动名称转换为文件名
@@ -867,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '闲逛': 'walk',
             '炒股': 'stock',
             '发呆': 'daydreaming',
-            '睡觉': 'daydreaming' // 暂时用发呆的音效代替睡觉
+            '睡觉': 'sleep' // 暂时用发呆的音效代替睡觉
         };
         
         return actionMap[action] || action.toLowerCase();
@@ -1594,6 +1649,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('musicianQuote').textContent = gameOverInfo.quote;
             document.getElementById('musicianName').textContent = gameOverInfo.musician;
             
+            // 移除乐谱视图（如果有）
+            const existingRhythmView = document.querySelector('.rhythm-view-container');
+            if (existingRhythmView) {
+                existingRhythmView.remove();
+            }
+            
             // 修改继续按钮文本
             continueButton.textContent = '重新开始';
             
@@ -1630,6 +1691,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 更新结算界面内容
             document.getElementById('musicTitle').textContent = musicInfo.title;
+            
+            // 创建并添加节拍图形视图
+            createRhythmView();
+            
             document.getElementById('musicianQuote').textContent = musicInfo.quote;
             document.getElementById('musicianName').textContent = musicInfo.musician;
             
@@ -1680,6 +1745,96 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 隐藏游戏界面
         gameContainer.style.display = 'none';
+    }
+    
+    // 创建节拍图形视图
+    function createRhythmView() {
+        // 移除现有的节拍视图（如果有）
+        const existingRhythmView = document.querySelector('.rhythm-view-container');
+        if (existingRhythmView) {
+            existingRhythmView.remove();
+        }
+        
+        // 创建容器
+        const rhythmViewContainer = document.createElement('div');
+        rhythmViewContainer.className = 'rhythm-view-container';
+        
+        // 创建标题
+        const rhythmViewTitle = document.createElement('h3');
+        rhythmViewTitle.className = 'rhythm-view-title';
+        rhythmViewTitle.textContent = '你的生活乐谱';
+        rhythmViewContainer.appendChild(rhythmViewTitle);
+        
+        // 创建节拍网格容器
+        const rhythmGrid = document.createElement('div');
+        rhythmGrid.className = 'rhythm-grid';
+        
+        // 获取所有被添加的行动
+        const activeActions = addedActions.filter(action => {
+            // 检查这个行动是否有至少一个激活的节拍
+            return Object.keys(noteData[action.id] || {}).length > 0;
+        });
+        
+        // 为每个有节拍的行动创建一行
+        activeActions.forEach(action => {
+            const actionId = action.id;
+            const actionNotes = noteData[actionId] || {};
+            
+            // 只为有节拍的行动创建行
+            if (Object.keys(actionNotes).length > 0) {
+                // 创建行容器
+                const rowContainer = document.createElement('div');
+                rowContainer.className = 'rhythm-row';
+                
+                // 行动名称
+                const actionLabel = document.createElement('div');
+                actionLabel.className = 'rhythm-action-label';
+                actionLabel.innerHTML = `${ACTION_EMOJIS[actionId] || ''} ${actionId}`;
+                rowContainer.appendChild(actionLabel);
+                
+                // 节拍容器
+                const beatsContainer = document.createElement('div');
+                beatsContainer.className = 'rhythm-beats-container';
+                
+                // 创建8列节拍格
+                for (let i = 0; i < GRID_COLUMNS; i++) {
+                    const beat = document.createElement('div');
+                    beat.className = 'rhythm-beat';
+                    
+                    // 如果这个节拍被激活，添加激活样式
+                    if (actionNotes[i]) {
+                        beat.classList.add('active');
+                        beat.innerHTML = ACTION_EMOJIS[actionId] || '';
+                    }
+                    
+                    beatsContainer.appendChild(beat);
+                }
+                
+                rowContainer.appendChild(beatsContainer);
+                rhythmGrid.appendChild(rowContainer);
+            }
+        });
+        
+        // 如果没有行动有节拍，显示提示信息
+        if (activeActions.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'rhythm-empty-message';
+            emptyMessage.textContent = '你的生活乐章还是一片空白';
+            rhythmGrid.appendChild(emptyMessage);
+        }
+        
+        rhythmViewContainer.appendChild(rhythmGrid);
+        
+        // 找到结算面板中的引用点，并插入节拍视图
+        const musicTitle = document.getElementById('musicTitle');
+        const quoteContainer = document.querySelector('.quote-container');
+        
+        if (musicTitle && quoteContainer) {
+            // 获取父容器
+            const settlementContent = document.querySelector('.settlement-content');
+            // 在曲目标题和音乐家点评之间插入
+            settlementContent.insertBefore(rhythmViewContainer, quoteContainer);
+        }
     }
     
     // 显示游戏结束信息

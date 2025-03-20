@@ -1438,37 +1438,36 @@ body {
 }
 
 .quote-container {
-    position: relative;
-    max-width: 80%;
-    margin: 40px auto 50px;
-    padding: 20px 30px;
-    background-color: rgba(255, 255, 255, 0.05);
+    background: rgba(30, 30, 60, 0.3);
     border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 15px 20px;
+    position: relative;
+    margin: 20px 0;
+    max-width: 90%;
+    width: 500px;
 }
 
 .quote-icon {
     position: absolute;
-    top: -10px;
-    left: 15px;
-    font-size: 3rem;
-    color: rgba(255, 255, 255, 0.2);
-    transform: rotate(180deg);
+    top: -5px;
+    left: 10px;
+    font-size: 24px;
+    color: rgba(255, 255, 255, 0.3);
 }
 
 .musician-quote {
-    font-size: 1.3rem;
-    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0 0 8px 0;
     font-style: italic;
-    color: rgba(255, 255, 255, 0.9);
-    margin: 0 0 15px 0;
-    text-align: left;
+    text-align: center;
 }
 
 .quote-attribution {
     text-align: right;
-    font-size: 1.1rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
 }
 
 .continue-button {
@@ -1601,4 +1600,106 @@ body {
 
 .settlement-screen.game-over .quote-attribution {
     opacity: 0.7;
+}
+
+/* 结算界面节拍视图样式 */
+.rhythm-view-container {
+    margin: 15px 0;
+    background: rgba(30, 30, 60, 0.5);
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    max-width: 90%;
+    width: 500px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.rhythm-view-title {
+    display: none; /* 隐藏标题 */
+}
+
+.rhythm-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* 减小行间距 */
+}
+
+.rhythm-row {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 4px 8px; /* 减小内边距 */
+    min-height: 35px; /* 设置最小高度 */
+}
+
+.rhythm-action-label {
+    display: none; /* 隐藏行动标签 */
+}
+
+.rhythm-beats-container {
+    display: flex;
+    flex-wrap: wrap; /* 允许换行 */
+    gap: 3px; /* 减小节拍间距 */
+    justify-content: center; /* 居中对齐 */
+    width: 100%; /* 占满容器宽度 */
+}
+
+.rhythm-beat {
+    width: 25px; /* 减小节拍大小 */
+    height: 25px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px; /* 减小字体大小 */
+    flex-shrink: 0; /* 防止压缩 */
+}
+
+.rhythm-beat.active {
+    background: rgba(149, 117, 205, 0.6);
+    box-shadow: 0 0 8px rgba(149, 117, 205, 0.4);
+    animation: rhythm-beat-pulse 2s infinite ease-in-out;
+}
+
+.rhythm-empty-message {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 10px 0;
+    font-style: italic;
+}
+
+@keyframes rhythm-beat-pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+    .rhythm-view-container {
+        padding: 10px;
+        max-height: 200px;
+    }
+    
+    .rhythm-row {
+        padding: 3px 6px;
+    }
+    
+    .rhythm-beat {
+        width: 22px;
+        height: 22px;
+        font-size: 12px;
+    }
+}
+
+/* 调整结算界面中的标题和引用容器的间距 */
+.music-title-container {
+    margin-bottom: 10px;
+}
+
+.quote-container {
+    margin-top: 10px;
 } 
