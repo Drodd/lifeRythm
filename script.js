@@ -23,7 +23,7 @@ window.addEventListener('error', function(event) {
 
 document.addEventListener('DOMContentLoaded', () => {
     // 常量定义
-    const BPM = 280;
+    const BPM = 140;
     const PLAY_LIMIT = 60;
     const GRID_COLUMNS = 8;
     const BEAT_DURATION = 60 / BPM; // 一拍的持续时间（秒）- 修正为60/BPM
@@ -303,21 +303,45 @@ document.addEventListener('DOMContentLoaded', () => {
             bar.className = `volume-bar`;
             bar.style.backgroundColor = attributeColors[attr].background;
             
-            // 根据数值设置宽度比例 - 调整计算方式
-            let maxValue, percentage;
+            // 创建残影层
+            const trailBar = document.createElement('div');
+            trailBar.className = `volume-bar-trail`;
+            
+            // 根据数值设置宽度比例 - 使用随机值作为纯视觉特效
+            // 为了保持一定的关联性，我们根据属性值进行加权随机
+            let percentage;
             
             if (attr === '欲望') {
-                // 欲望上限为金钱值
-                maxValue = Math.max(1, playerStats.金钱);
-                percentage = Math.min(100, (playerStats[attr] / maxValue) * 100);
+                // 欲望：保持一定关联性但仍然随机
+                const basePercentage = Math.min(100, (playerStats[attr] / Math.max(1, playerStats.金钱)) * 100);
+                // 加权随机：真实值占70%权重，随机值占30%权重
+                percentage = basePercentage * 0.5 + (Math.random() * 50); // 50%真实值+随机值
+            } else if (attr === '金钱') {
+                // 金钱：作为主要属性，保持较高的真实性
+                const basePercentage = Math.min(100, 100 * Math.log(1 + playerStats[attr] / 10) / Math.log(11));
+                percentage = basePercentage * 0.6 + (Math.random() * 40); // 60%真实值+随机值
             } else {
-                // 金钱和见闻使用更适合游戏进度的动态比例
-                // 使用对数比例使得即使很大的值也能显示得更好
-                let baseValue = 100; // 基础参考值
-                percentage = Math.min(100, 100 * Math.log(1 + playerStats[attr] / 10) / Math.log(11)); // 对数比例
+                // 见闻：中等程度的随机性
+                const basePercentage = Math.min(100, 100 * Math.log(1 + playerStats[attr] / 10) / Math.log(11));
+                percentage = basePercentage * 0.5 + (Math.random() * 50); // 50%真实值+随机值
             }
             
+            // 确保百分比在有效范围内
+            percentage = Math.min(100, Math.max(5, percentage));
+            
             bar.style.width = `${percentage}%`;
+            
+            // 获取上次存储的残影宽度
+            const trailWidth = barContainer.getAttribute('data-trail-width');
+            
+            // 如果新的宽度大于残影宽度，更新残影宽度
+            if (!trailWidth || parseFloat(percentage) > parseFloat(trailWidth)) {
+                trailBar.style.width = `${percentage}%`;
+                barContainer.setAttribute('data-trail-width', percentage);
+            } else {
+                // 否则使用之前的残影宽度（它会通过CSS动画自动缩小到0）
+                trailBar.style.width = `${trailWidth}%`;
+            }
             
             // 添加值变化动画的处理
             const oldValue = bar.getAttribute('data-old-value');
@@ -334,6 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // 存储当前值，以便下次比较
             bar.setAttribute('data-old-value', newValue);
             
+            // 先添加残影层，再添加主进度条（确保主进度条在上层）
+            barContainer.appendChild(trailBar);
             barContainer.appendChild(bar);
             statRow.appendChild(barContainer);
             
@@ -1005,14 +1031,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 检查是否需要增加效率
         if (shouldIncreaseEfficiency(addedActions.length)) {
-            playerStats.效率 += 1;
+            updatePlayerStat('效率', playerStats.效率 + 1);
             newEfficiency = playerStats.效率;
             efficiencyIncreased = true;
         }
         
         // 检查是否需要增加耐心
         if (shouldIncreasePatience(addedActions.length)) {
-            playerStats.耐心 += 1;
+            updatePlayerStat('耐心', playerStats.耐心 + 1);
             newPatience = playerStats.耐心;
             patienceIncreased = true;
         }
@@ -1603,6 +1629,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 更新属性显示
             updateStatsDisplay();
+            updateSecondaryStats(); // 确保二级属性也被更新
             
             // 确保所有行动按钮的样式正确更新
             updateAllActionButtonStyles();
@@ -1789,14 +1816,47 @@ document.addEventListener('DOMContentLoaded', () => {
         const volumeBar = volumeBarContainer.querySelector('.volume-bar');
         if (!volumeBar) return;
         
+        // 找到残影层
+        const trailBar = volumeBarContainer.querySelector('.volume-bar-trail');
+        if (!trailBar) return;
+        
         // 存储原始宽度
         const originalWidth = volumeBar.style.width;
-        const originalPercentage = parseFloat(originalWidth);
+        
+        // 在动画开始前更新残影宽度，以原始宽度作为残影基准点
+        const currentTrailWidth = volumeBarContainer.getAttribute('data-trail-width');
+        const newWidth = parseFloat(originalWidth);
+        
+        // 仅当新宽度比当前残影宽度大时更新残影
+        if (!currentTrailWidth || newWidth > parseFloat(currentTrailWidth)) {
+            trailBar.style.width = originalWidth;
+            volumeBarContainer.setAttribute('data-trail-width', newWidth);
+            
+            // 在更新残影宽度后，启动缩短动画 - 移除过渡然后立即恢复过渡
+            trailBar.style.transition = 'none';
+            void trailBar.offsetWidth; // 强制重排
+            
+            // 根据属性设置不同的动画时长，使残影效果错开
+            let transitionDuration;
+            switch(attr) {
+                case 'money': transitionDuration = '2.5s'; break;
+                case 'knowledge': transitionDuration = '3s'; break;
+                case 'desire': transitionDuration = '3.5s'; break;
+                default: transitionDuration = '3s';
+            }
+            
+            trailBar.style.transition = `width ${transitionDuration} linear`;
+            
+            // 错开时间启动缩短动画，避免所有属性同时缩短
+            setTimeout(() => {
+                trailBar.style.width = '0%';
+            }, attr === 'money' ? 200 : (attr === 'knowledge' ? 350 : 500));
+        }
         
         // 创建一个随机振动效果
         let animationCount = 0;
-        const maxAnimations = 6; // 增加振动次数
-        const baseDelay = 80; // 基础延迟时间（毫秒）
+        const maxAnimations = 8; // 增加振动次数
+        const baseDelay = 60;
         
         const animate = () => {
             if (animationCount >= maxAnimations) {
@@ -1805,17 +1865,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // 生成随机宽度变化 (原始宽度基础上随机变化25%-50%)
-            let randomOffset;
-            if (animationCount % 2 === 0) {
-                // 偶数次增加宽度
-                randomOffset = originalPercentage * (Math.random() * 0.25 + 0.25);
-                volumeBar.style.width = `${Math.min(100, originalPercentage + randomOffset)}%`;
-            } else {
-                // 奇数次减少宽度
-                randomOffset = originalPercentage * (Math.random() * 0.15 + 0.10);
-                volumeBar.style.width = `${Math.max(10, originalPercentage - randomOffset)}%`;
-            }
+            // 生成完全随机宽度 (0-100%)
+            const randomPercentage = Math.random() * 100;
+            volumeBar.style.width = `${randomPercentage}%`;
             
             // 添加动画类
             volumeBar.classList.add('volume-bar-animate');
@@ -1826,11 +1878,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 animationCount++;
                 
                 // 根据动画计数动态调整延迟时间，创造渐渐平息的效果
-                const dynamicDelay = baseDelay + (animationCount * 40);
+                const dynamicDelay = baseDelay + (animationCount * 20);
                 
                 // 继续下一次动画
                 setTimeout(animate, dynamicDelay);
-            }, 200);
+            }, 120);
         };
         
         // 开始动画
@@ -1842,18 +1894,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // 获取旧值
         const oldValue = playerStats[stat];
         
-        // 如果值没有变化，直接返回
-        if (oldValue === value) {
-            return;
-        }
-        
         // 更新值
         playerStats[stat] = value;
         
         // 更新显示
         updateStatsDisplay();
         
-        // 只有主要属性（金钱、见闻、欲望）变化时才触发动画
+        // 如果是效率或耐心属性，更新二级属性显示
+        if (stat === '效率' || stat === '耐心') {
+            updateSecondaryStats();
+        }
+        
+        // 如果是主要属性（金钱、见闻、欲望），总是触发动画（不管值是否变化）
         if (['金钱', '见闻', '欲望'].includes(stat)) {
             // 确定对应的bar类名
             let barClass;
@@ -1864,12 +1916,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 default: return; // 其他属性不触发动画
             }
             
-            // 触发音量条动画
-            animateVolumeBar(barClass);
+            // 初始化时延迟触发残影效果，以确保DOM已完全加载
+            setTimeout(() => {
+                // 触发音量条动画
+                animateVolumeBar(barClass);
+            }, 100);
             
             // 在控制台记录值的变化，便于调试
             console.log(`属性 ${stat} 从 ${oldValue} 变为 ${value}`);
         }
+    }
+    
+    // 更新二级属性（效率和耐心）显示
+    function updateSecondaryStats() {
+        const efficiencyElement = document.querySelector('.right-controls .secondary-stat:first-child');
+        const patienceElement = document.querySelector('.right-controls .secondary-stat:last-child');
+        
+        if (efficiencyElement) {
+            const efficiencySpan = efficiencyElement.querySelector('span');
+            if (efficiencySpan) {
+                const oldValue = parseInt(efficiencySpan.textContent);
+                const newValue = playerStats.效率;
+                
+                efficiencySpan.textContent = newValue;
+                
+                // 如果值增加了，添加动画效果
+                if (newValue > oldValue) {
+                    // 先移除可能存在的动画类
+                    efficiencyElement.classList.remove('secondary-stat-flash');
+                    
+                    // 触发重排
+                    void efficiencyElement.offsetWidth;
+                    
+                    // 添加动画类
+                    efficiencyElement.classList.add('secondary-stat-flash');
+                    
+                    // 一段时间后移除动画类
+                    setTimeout(() => {
+                        efficiencyElement.classList.remove('secondary-stat-flash');
+                    }, 1000);
+                }
+            }
+        }
+        
+        if (patienceElement) {
+            const patienceSpan = patienceElement.querySelector('span');
+            if (patienceSpan) {
+                const oldValue = parseInt(patienceSpan.textContent);
+                const newValue = playerStats.耐心;
+                
+                patienceSpan.textContent = newValue;
+                
+                // 如果值增加了，添加动画效果
+                if (newValue > oldValue) {
+                    // 先移除可能存在的动画类
+                    patienceElement.classList.remove('secondary-stat-flash');
+                    
+                    // 触发重排
+                    void patienceElement.offsetWidth;
+                    
+                    // 添加动画类
+                    patienceElement.classList.add('secondary-stat-flash');
+                    
+                    // 一段时间后移除动画类
+                    setTimeout(() => {
+                        patienceElement.classList.remove('secondary-stat-flash');
+                    }, 1000);
+                }
+            }
+        }
+        
+        console.log(`二级属性更新 - 效率: ${playerStats.效率}, 耐心: ${playerStats.耐心}`);
     }
     
     // 在文档底部调用初始化函数
@@ -1892,6 +2009,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 继续其他初始化
             console.log('DOM元素获取成功，继续初始化...');
+            
+            // 确保二级属性正确显示
+            updateSecondaryStats();
             
             // 初始化 - 如果上面的restructureHeader失败，就使用HTML中已有的元素，不再尝试重构
             if (headerRestructured) {
