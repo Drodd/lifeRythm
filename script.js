@@ -21,49 +21,129 @@ window.addEventListener('error', function(event) {
     document.body.appendChild(errorDiv);
 });
 
+// 音频相关全局变量
+let audioContext = null;
+let audioBuffers = {}; // 确保这声明在全局范围内
+let audioInitialized = false;
+let activeSounds = {}; // 确保activeSounds也在全局范围内初始化
+
+// 全局变量
+let loadingProgressBar;
+let loadingStatus;
+let initialLoadComplete = false;
+
+// 行动列表 (原音效列表) - 移到全局范围
+const ACTION_TYPES = [
+    '工作', '吃饭', '阅读', '听歌', '看剧', 
+    '玩游戏', '聊天', '运动', '创作', '学习', 
+    '刷手机', '上厕所', '闲逛', '炒股', '发呆', '睡觉'
+];
+
 document.addEventListener('DOMContentLoaded', () => {
-    // 游戏开始界面逻辑
-    const startScreen = document.getElementById('startScreen');
-    const gameContainer = document.getElementById('gameContainer');
+    // 获取加载界面元素
+    loadingProgressBar = document.getElementById('loading-progress-bar');
+    loadingStatus = document.getElementById('loading-status');
+    
+    // 获取游戏开始界面和结算界面
+    const startScreen = document.getElementById('startScreen'); 
     const startGameButton = document.getElementById('startGameButton');
+    const loadingScreen = document.getElementById('loading-screen');
     const settlementScreen = document.getElementById('settlementScreen');
     const continueButton = document.getElementById('continueButton');
+    const gameContainer = document.getElementById('gameContainer');
+    
+    // 开始初始化资源
+    initializeResources().then(audioSuccess => {
+        // 资源加载完成，显示开始游戏按钮
+        loadingScreen.style.display = 'none';
+        startScreen.style.display = 'flex'; // 使用flex布局
+        
+        // 显示音频加载状态
+        if (!audioSuccess) {
+            // 创建一个警告提示
+            const audioWarning = document.createElement('div');
+            audioWarning.className = 'audio-warning';
+            audioWarning.innerHTML = '⚠️ 音频加载失败，游戏将以静音模式运行';
+            audioWarning.style.color = '#ffcc00';
+            audioWarning.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            audioWarning.style.padding = '8px 12px';
+            audioWarning.style.borderRadius = '4px';
+            audioWarning.style.fontSize = '14px';
+            audioWarning.style.margin = '10px auto';
+            audioWarning.style.textAlign = 'center';
+            audioWarning.style.maxWidth = '90%';
+            
+            // 将警告添加到开始界面
+            const startContent = startScreen.querySelector('.start-content');
+            if (startContent) {
+                startContent.insertBefore(audioWarning, startGameButton);
+            }
+        }
+        
+        console.log('资源加载完成，显示开始界面' + (audioSuccess ? '' : '（无音频）'));
+    }).catch(error => {
+        // 资源加载失败，显示错误信息
+        console.error('资源加载失败:', error);
+        loadingStatus.textContent = '资源加载失败，请刷新页面重试。';
+        loadingProgressBar.style.width = '100%';
+        loadingProgressBar.style.backgroundColor = '#f44336';
+        
+        // 允许直接点击进入游戏，但显示警告
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+            
+            // 创建错误警告
+            const errorWarning = document.createElement('div');
+            errorWarning.className = 'error-warning';
+            errorWarning.innerHTML = '⚠️ 资源加载失败，游戏可能无法正常运行，建议刷新页面重试';
+            errorWarning.style.color = '#ff4444';
+            errorWarning.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            errorWarning.style.padding = '10px 15px';
+            errorWarning.style.borderRadius = '4px';
+            errorWarning.style.fontSize = '14px';
+            errorWarning.style.margin = '10px auto';
+            errorWarning.style.textAlign = 'center';
+            errorWarning.style.maxWidth = '90%';
+            
+            // 将警告添加到开始界面
+            const startContent = startScreen.querySelector('.start-content');
+            if (startContent) {
+                startContent.insertBefore(errorWarning, startGameButton);
+            }
+        }, 3000); // 3秒后显示开始界面
+    });
     
     // 点击开始游戏按钮
     startGameButton.addEventListener('click', () => {
-        // 隐藏开始界面
-        startScreen.style.opacity = '0';
-        setTimeout(() => {
-            startScreen.style.display = 'none';
+        // 检查资源是否已加载完成
+        if (!initialLoadComplete) {
+            console.warn('游戏资源尚未加载完成，无法开始游戏');
+            return;
+        }
+        
+        // 开始游戏
+        startGame();
+    });
+    
+    // 点击继续演奏按钮
+    if (continueButton) {
+        continueButton.addEventListener('click', () => {
+            // 注意：此事件监听器将被showSettlementScreen函数中的onclick属性覆盖
+            // 保留此代码是为了向后兼容
+            
+            // 隐藏结算界面
+            if (settlementScreen) {
+                settlementScreen.style.display = 'none';
+            }
             
             // 显示游戏界面
             gameContainer.style.display = 'flex';
             
-            // 初始化游戏
-            initializeGame();
-            
-            // 自动开始播放
+            // 继续播放
             startPlayback();
-        }, 500);
-        
-        // 添加过渡效果
-        startScreen.style.transition = 'opacity 0.5s ease';
-    });
-    
-    // 点击继续演奏按钮
-    continueButton.addEventListener('click', () => {
-        // 注意：此事件监听器将被showSettlementScreen函数中的onclick属性覆盖
-        // 保留此代码是为了向后兼容
-        
-        // 隐藏结算界面
-        settlementScreen.style.display = 'none';
-        
-        // 显示游戏界面
-        gameContainer.style.display = 'flex';
-        
-        // 继续播放
-        startPlayback();
-    });
+        });
+    }
     
     // 游戏初始化函数
     function initializeGame() {
@@ -117,13 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const GRID_COLUMNS = 8;
     const BEAT_DURATION = 60 / BPM; // 一拍的持续时间（秒）- 修正为60/BPM
     const ANIMATION_DURATION = BEAT_DURATION * GRID_COLUMNS; // 总动画时间
-    
-    // 行动列表 (原音效列表)
-    const ACTION_TYPES = [
-        '工作', '吃饭', '阅读', '听歌', '看剧', 
-        '玩游戏', '聊天', '运动', '创作', '学习', 
-        '刷手机', '上厕所', '闲逛', '炒股', '发呆', '睡觉'
-    ];
     
     // 已添加的行动（初始有2个）
     const addedActions = [
@@ -266,10 +339,10 @@ document.addEventListener('DOMContentLoaded', () => {
         耐心: 3   // 新增耐心属性，初始值为3
     };
     
-    // 音频上下文
-    let audioContext;
-    let audioBuffers = {};
-    let audioInitialized = false; // 标记音频是否已初始化
+    // 音频上下文（已在全局定义，这里不需要重复定义）
+    // let audioContext;
+    // let audioBuffers = {};
+    // let audioInitialized = false; 
     
     // 音符数据（行动 => 列位置的集合）
     const noteData = {};
@@ -689,25 +762,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initAudio() {
         if (audioInitialized) {
             console.log('音频已经初始化，跳过初始化过程');
-            return;
+            return true;
         }
         
         console.log('开始初始化音频...');
         window.debugLog && window.debugLog('开始初始化音频...');
         
         try {
-            // 创建音频上下文
-            if (!audioContext) {
-                console.log('创建新的音频上下文');
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // 监听音频上下文状态变化
-                audioContext.onstatechange = () => {
-                    console.log('音频上下文状态变化:', audioContext.state);
-                    window.debugLog && window.debugLog(`音频上下文状态: ${audioContext.state}`);
-                };
-            }
-            
             console.log('ACTION_TYPES:', ACTION_TYPES);
             
             // 分批加载音频文件以避免并发连接限制
@@ -733,14 +794,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             
-            // 分批加载音频文件，每批最多4个
-            const batchSize = 4;
+            // 计算每个音频文件的加载进度权重
+            const totalFiles = audioFiles.length;
+            const baseProgress = 10; // 起始进度
+            const maxProgress = 95; // 最大进度
+            const progressPerFile = (maxProgress - baseProgress) / totalFiles;
+            
+            // 分批加载音频文件，每批最多3个
+            const batchSize = 3;
             const maxAttempts = 3;
             let loadSuccessCount = 0;
             let loadFailCount = 0;
             
             console.log(`开始分批加载音频，每批${batchSize}个文件`);
             window.debugLog && window.debugLog(`分批加载音频，每批${batchSize}个`);
+            updateLoadingStatus(`开始加载音频文件 (0/${totalFiles})`, baseProgress);
             
             // 分批加载函数
             async function loadBatch(startIndex) {
@@ -748,6 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 所有批次都已加载完成
                     console.log(`音频批量加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`);
                     window.debugLog && window.debugLog(`音频加载: 成功 ${loadSuccessCount}, 失败 ${loadFailCount}`);
+                    updateLoadingStatus(`音频加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`, 95);
                     
                     // 检查是否有未加载的音频需要重试
                     const unloadedFiles = audioFiles.filter(file => !file.loaded && file.attempts < maxAttempts);
@@ -755,6 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (unloadedFiles.length > 0) {
                         console.log(`重试加载 ${unloadedFiles.length} 个未加载的音频文件`);
                         window.debugLog && window.debugLog(`重试加载 ${unloadedFiles.length} 个音频`);
+                        updateLoadingStatus(`重试加载失败的音频文件 (${unloadedFiles.length}个)...`, 95);
                         
                         // 重置索引，开始重试
                         for (const file of unloadedFiles) {
@@ -766,17 +836,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     // 对于仍未加载的文件，使用备用音效
-                    for (const file of audioFiles.filter(file => !file.loaded)) {
-                        console.log(`音频 ${file.filename} 在 ${file.attempts} 次尝试后仍未加载，使用备用音效`);
-                        window.debugLog && window.debugLog(`使用备用音效: ${file.filename}`);
+                    const stillUnloadedFiles = audioFiles.filter(file => !file.loaded);
+                    if (stillUnloadedFiles.length > 0) {
+                        console.log(`${stillUnloadedFiles.length} 个音频文件无法加载，使用备用音效`);
                         
-                        if (file.id === 'base_rhythm') {
-                            console.log('使用空白音频作为基础节奏');
-                            audioBuffers['base_rhythm'] = createEmptyBuffer();
-                        } else {
-                            console.log(`为行动 ${file.id} 生成备用音效`);
-                            const buffer = await generateSound(file.id);
-                            audioBuffers[file.id] = buffer;
+                        for (const file of stillUnloadedFiles) {
+                            console.log(`音频 ${file.filename} 在 ${file.attempts} 次尝试后仍未加载，使用备用音效`);
+                            window.debugLog && window.debugLog(`使用备用音效: ${file.filename}`);
+                            
+                            if (file.id === 'base_rhythm') {
+                                console.log('使用空白音频作为基础节奏');
+                                audioBuffers['base_rhythm'] = createEmptyBuffer();
+                            } else {
+                                console.log(`为行动 ${file.id} 生成备用音效`);
+                                const buffer = await generateSound(file.id);
+                                audioBuffers[file.id] = buffer;
+                            }
                         }
                     }
                     
@@ -785,16 +860,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // 初始化完成
                     audioInitialized = true;
-                    return true;
+                    // 如果所有文件都加载成功或者使用了备用音效，返回成功
+                    return (loadSuccessCount > 0);
                 }
                 
                 // 计算当前批次的结束索引
                 const endIndex = Math.min(startIndex + batchSize, audioFiles.length);
                 const currentBatch = audioFiles.slice(startIndex, endIndex);
                 const batchNumber = Math.floor(startIndex / batchSize) + 1;
+                const totalBatches = Math.ceil(audioFiles.length / batchSize);
                 
-                console.log(`加载第 ${batchNumber} 批音频 (${currentBatch.length} 个文件)`);
+                console.log(`加载第 ${batchNumber}/${totalBatches} 批音频 (${currentBatch.length} 个文件)`);
                 window.debugLog && window.debugLog(`加载第 ${batchNumber} 批音频`);
+                updateLoadingStatus(`加载音频 - 批次 ${batchNumber}/${totalBatches}`, baseProgress + progressPerFile * startIndex);
                 
                 // 找出当前批次中未加载且尝试次数小于最大尝试次数的文件
                 const filesToLoad = currentBatch.filter(file => !file.loaded && file.attempts < maxAttempts);
@@ -818,6 +896,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             audioBuffers[file.id] = buffer;
                             file.loaded = true;
                             loadSuccessCount++;
+                            
+                            // 更新进度显示
+                            const currentProgress = baseProgress + progressPerFile * (startIndex + loadSuccessCount);
+                            updateLoadingStatus(`已加载 ${loadSuccessCount}/${totalFiles} 个音频文件`, currentProgress);
                             
                             return buffer;
                         })
@@ -843,16 +925,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 await Promise.all(promises);
                 
                 // 短暂延迟，让浏览器有时间释放连接
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // 加载下一批
                 return loadBatch(endIndex);
             }
             
             // 开始加载第一批
-            await loadBatch(0);
+            const loadResult = await loadBatch(0);
             
-            return true;
+            return loadResult;
         } catch (error) {
             console.error('初始化音频失败:', error);
             window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
@@ -860,6 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 初始化备用音效
             console.log('使用备用音效系统');
             window.debugLog && window.debugLog('使用备用音效系统');
+            updateLoadingStatus('音频加载失败，使用备用音效系统...', 90);
             
             try {
                 // 为所有行动生成备用音效
@@ -873,7 +956,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 标记为初始化完成
                 audioInitialized = true;
-                return true;
+                return true; // 使用备用音效成功
             } catch (fallbackError) {
                 console.error('备用音效也初始化失败:', fallbackError);
                 window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
@@ -884,6 +967,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 创建空白的音频缓冲区
     function createEmptyBuffer() {
+        if (!audioContext) {
+            console.warn('音频上下文未初始化，无法创建空白缓冲区');
+            // 创建一个伪缓冲区对象作为替代
+            return {
+                duration: 0.1,
+                numberOfChannels: 1,
+                length: 4410, // 44100 * 0.1，标准采样率0.1秒的长度
+                getChannelData: function() {
+                    return new Float32Array(4410);
+                }
+            };
+        }
+        
         const sampleRate = audioContext.sampleRate;
         const duration = 0.1; // 很短的声音
         const frameCount = sampleRate * duration;
@@ -998,6 +1094,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // 生成简单的合成声音 (作为备用音效)
     function generateSound(action) {
         return new Promise((resolve) => {
+            if (!audioContext) {
+                console.warn('音频上下文未初始化，无法生成音效');
+                // 创建一个伪缓冲区对象作为替代
+                resolve({
+                    duration: 0.5,
+                    numberOfChannels: 1,
+                    length: 22050, // 44100 * 0.5，标准采样率0.5秒的长度
+                    getChannelData: function() {
+                        return new Float32Array(22050);
+                    }
+                });
+                return;
+            }
+            
             const sampleRate = audioContext.sampleRate;
             const duration = 0.5; // 声音持续时间（秒）
             const frameCount = sampleRate * duration;
@@ -1172,7 +1282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 跟踪活跃的声音对象
-    const activeSounds = {};
+    // 使用全局定义的activeSounds变量，不需要再次声明
     
     // 跟踪正在播放的声音
     function trackActiveSound(actionId, source, gainNode) {
@@ -1588,6 +1698,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 更新解锁按钮状态
     function updateUnlockButtonState() {
+        // 检查addTrackButton是否存在
+        if (!addTrackButton) {
+            console.log('解锁按钮未初始化，跳过状态更新');
+            return;
+        }
+        
         // 检查是否还有可解锁的行动
         const hasUnlockableActions = ACTION_TYPES.length > addedActions.length;
         
@@ -1607,14 +1723,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // 如果达到解锁条件，自动解锁新行动
         if (currentKnowledge >= requiredKnowledge) {
             // 满足解锁条件，随机选择一个行动解锁
-            const randomAction = getNextUnlockableAction();
-            if (randomAction) {
-                addAction(randomAction);
-                // 解锁后重新检查（以防有多个行动可以解锁）
-                setTimeout(updateUnlockButtonState, 100);
-            }
+            addTrackButton.textContent = "领悟新行动";
+            addTrackButton.disabled = false;
+            addTrackButton.classList.remove('disabled');
+            addTrackButton.classList.add('unlockable');
         } else {
-            // 未达到解锁条件，更新按钮文本为解锁需要的见闻值
+            // 未满足解锁条件
             addTrackButton.textContent = `见闻${requiredKnowledge} 领悟`;
             addTrackButton.disabled = true;
             addTrackButton.classList.add('disabled');
@@ -2228,42 +2342,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化
     function initialize() {
         try {
-            // 初始化已经在外部完成了顶部布局重构，这里不再重复调用
-            // restructureHeader();
+            console.log("开始游戏初始化...");
+            window.debugLog && window.debugLog("开始游戏初始化...");
             
-            // 然后获取DOM元素引用 - 如果外部调用已经获取成功，这里就不需要再次获取
-            // if (!getDOMElements()) {
-            //    console.error("无法获取关键DOM元素，中止初始化");
-            //    return; // 如果无法获取DOM元素，则中止初始化
-            // }
+            // 重构顶部布局
+            console.log("开始重构顶部布局");
+            restructureHeader();
+            console.log("顶部布局重构完成");
             
-            // 初始化网格 - 这会重新创建和引用addTrackButton
-            initGrid();
-            
-            // 初始化其他界面元素
-            initTrackButtons();
-            initPresetNotes(); // 设置预设的音符模式
-            initAudio();
-            
-            // 更新属性显示
-            updateStatsDisplay();
-            updateSecondaryStats(); // 确保二级属性也被更新
-            
-            // 确保所有行动按钮的样式正确更新
-            updateAllActionButtonStyles();
-            
-            // 更新解锁按钮状态
-            updateUnlockButtonState();
-            
-            // 监听窗口大小变化
-            window.addEventListener('resize', () => {
-                // 不再需要同步滚动
-            });
-            
-            // 监听设备方向变化（移动设备）
-            window.addEventListener('orientationchange', () => {
-                // 不再需要同步滚动
-            });
+            // 设置延迟获取DOM元素，确保布局重构后的元素都已经准备好
+            console.log("延迟执行DOM元素获取...");
+            setTimeout(() => {
+                // 重新获取DOM元素
+                getDOMElements();
+                console.log("DOM元素获取成功，继续初始化...");
+                
+                // 初始化游戏网格
+                initGrid();
+                
+                // 更新二级属性值
+                updateSecondaryStats();
+                
+                // 注册按钮点击事件
+                setupEventListeners();
+                
+                // 更新所有行动按钮样式
+                updateAllActionButtonStyles();
+                
+                // 初始化预设音符
+                initPresetNotes();
+                
+                // 显示游戏界面
+                gameContainer.style.opacity = "1";
+                
+                console.log("游戏初始化完成");
+            }, 50);
             
             // 防止iOS上的音频问题
             document.addEventListener('touchstart', () => {
@@ -2271,12 +2384,61 @@ document.addEventListener('DOMContentLoaded', () => {
                     audioContext.resume();
                 }
             });
-            
-            console.log("游戏初始化完成");
         } catch (error) {
             console.error("初始化过程中发生错误:", error);
             window.debugLog && window.debugLog(`初始化错误: ${error.message}`);
         }
+    }
+    
+    // 设置事件监听器
+    function setupEventListeners() {
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            // 可以在这里添加响应式调整的代码
+        });
+        
+        // 监听设备方向变化（移动设备）
+        window.addEventListener('orientationchange', () => {
+            // 可以在这里添加设备方向变化的处理代码
+        });
+        
+        // 为解锁按钮添加点击事件，先检查按钮是否存在
+        const unlockButton = document.getElementById('unlockButton');
+        if (unlockButton) {
+            unlockButton.addEventListener('click', () => {
+                const action = getNextUnlockableAction();
+                if (action) {
+                    // 解锁新行动
+                    unlockNewAction(action);
+                }
+            });
+            
+            // 更新解锁按钮状态
+            updateUnlockButtonState();
+        } else {
+            console.log('解锁按钮未找到，跳过事件监听器设置');
+        }
+        
+        // 更新属性显示
+        updateStatsDisplay();
+    }
+    
+    // 修改开始游戏函数，加入自动开始播放
+    function startGame() {
+        // 隐藏开始界面
+        startScreen.style.display = 'none';
+        
+        // 显示游戏容器
+        gameContainer.style.display = 'block';
+        
+        // 初始化游戏
+        initialize();
+        
+        // 添加短暂延迟确保初始化完成
+        setTimeout(() => {
+            // 自动开始播放
+            startPlayback();
+        }, 300);
     }
     
     // 初始化预设音符
@@ -2957,4 +3119,212 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 将测试函数暴露给全局作用域，方便在控制台调用
     window.testAudio = testAudio;
+
+    // 资源初始化函数
+    async function initializeResources() {
+        // 更新加载状态
+        updateLoadingStatus('正在初始化游戏资源...', 5);
+        
+        try {
+            // 确保音频相关变量已初始化
+            if (typeof audioBuffers === 'undefined') {
+                audioBuffers = {};
+            }
+            
+            // activeSounds已在全局初始化，无需重复检查
+            
+            // 创建音频上下文
+            let audioContextCreated = false;
+            if (!audioContext) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioContextCreated = true;
+                    
+                    // 监听音频上下文状态变化
+                    audioContext.onstatechange = () => {
+                        console.log('音频上下文状态变化:', audioContext.state);
+                        window.debugLog && window.debugLog(`音频上下文状态: ${audioContext.state}`);
+                    };
+                } catch (audioError) {
+                    console.error('无法创建音频上下文:', audioError);
+                    window.debugLog && window.debugLog('音频初始化失败，游戏将无声运行');
+                    updateLoadingStatus('无法创建音频上下文，游戏将以静音模式运行', 20);
+                    await new Promise(resolve => setTimeout(resolve, 1500)); // 显示错误消息1.5秒
+                }
+            } else {
+                audioContextCreated = true;
+            }
+            
+            // 获取所有需要加载的音频文件
+            updateLoadingStatus('准备加载音频文件...', 10);
+            
+            let audioLoadSuccess = false;
+            
+            // 初始化音频
+            if (audioContextCreated) {
+                try {
+                    audioLoadSuccess = await initAudio();
+                    if (!audioLoadSuccess) {
+                        throw new Error('音频加载失败');
+                    }
+                } catch (audioError) {
+                    console.error('音频加载失败:', audioError);
+                    window.debugLog && window.debugLog('音频加载失败，使用备用生成音效');
+                    updateLoadingStatus('音频加载失败，使用备用音效...', 80);
+                    await new Promise(resolve => setTimeout(resolve, 1500)); // 显示错误消息1.5秒
+                    
+                    // 使用备用的生成音效
+                    try {
+                        // 为所有行动生成备用音效
+                        updateLoadingStatus('生成备用音效中...', 85);
+                        
+                        // 只有在audioContext存在时才尝试生成音效
+                        if (audioContext) {
+                            for (const action of ACTION_TYPES) {
+                                const buffer = await generateSound(action);
+                                audioBuffers[action] = buffer;
+                            }
+                            
+                            // 创建一个空白的背景节奏
+                            audioBuffers['base_rhythm'] = createEmptyBuffer();
+                            
+                            // 标记为初始化完成
+                            audioInitialized = true;
+                            audioLoadSuccess = true;
+                        } else {
+                            // 如果没有audioContext，创建一些空对象作为占位符
+                            console.warn('无法生成备用音效，游戏将以静音模式运行');
+                            for (const action of ACTION_TYPES) {
+                                audioBuffers[action] = {
+                                    duration: 0.5,
+                                    numberOfChannels: 1,
+                                    length: 22050,
+                                    getChannelData: function() {
+                                        return new Float32Array(22050);
+                                    }
+                                };
+                            }
+                            
+                            // 背景节奏占位符
+                            audioBuffers['base_rhythm'] = {
+                                duration: 0.1,
+                                numberOfChannels: 1,
+                                length: 4410,
+                                getChannelData: function() {
+                                    return new Float32Array(4410);
+                                }
+                            };
+                            
+                            // 标记为初始化完成（静音模式）
+                            audioInitialized = true;
+                            audioLoadSuccess = false;
+                        }
+                        
+                        updateLoadingStatus('备用音效生成完成', 95);
+                    } catch (fallbackError) {
+                        console.error('备用音效也初始化失败:', fallbackError);
+                        window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
+                        updateLoadingStatus('音效初始化完全失败，游戏将无声运行', 90);
+                        await new Promise(resolve => setTimeout(resolve, 1500)); // 显示错误消息1.5秒
+                        
+                        // 即使是备用音效也失败了，设置为静音模式
+                        audioInitialized = true;
+                        audioLoadSuccess = false;
+                    }
+                }
+            } else {
+                // 如果无法创建音频上下文，创建空的音频缓冲区
+                updateLoadingStatus('使用静音模式...', 30);
+                
+                // 创建空的音频缓冲区作为占位符
+                for (const action of ACTION_TYPES) {
+                    audioBuffers[action] = {
+                        duration: 0.5,
+                        numberOfChannels: 1,
+                        length: 22050,
+                        getChannelData: function() {
+                            return new Float32Array(22050);
+                        }
+                    };
+                }
+                
+                // 背景节奏占位符
+                audioBuffers['base_rhythm'] = {
+                    duration: 0.1,
+                    numberOfChannels: 1,
+                    length: 4410,
+                    getChannelData: function() {
+                        return new Float32Array(4410);
+                    }
+                };
+                
+                // 标记为初始化完成（静音模式）
+                audioInitialized = true;
+                audioLoadSuccess = false;
+                
+                // 显示静音模式提示
+                updateLoadingStatus('游戏将以静音模式运行', 90);
+                await new Promise(resolve => setTimeout(resolve, 1500)); // 显示信息1.5秒
+            }
+            
+            // 所有资源加载完成
+            updateLoadingStatus('资源加载完成！准备开始游戏...', 100);
+            initialLoadComplete = true;
+            
+            return audioLoadSuccess;
+        } catch (error) {
+            console.error('初始化资源失败:', error);
+            updateLoadingStatus('资源加载失败: ' + error.message, 100);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 显示错误消息2秒
+            
+            // 资源加载彻底失败，但仍允许游戏启动
+            initialLoadComplete = true;
+            
+            // 创建空的占位符，使游戏能够在静音模式下运行
+            try {
+                for (const action of ACTION_TYPES) {
+                    audioBuffers[action] = {
+                        duration: 0.5,
+                        numberOfChannels: 1,
+                        length: 22050,
+                        getChannelData: function() {
+                            return new Float32Array(22050);
+                        }
+                    };
+                }
+                
+                // 背景节奏占位符
+                audioBuffers['base_rhythm'] = {
+                    duration: 0.1,
+                    numberOfChannels: 1,
+                    length: 4410,
+                    getChannelData: function() {
+                        return new Float32Array(4410);
+                    }
+                };
+                
+                // 标记为初始化完成（静音模式）
+                audioInitialized = true;
+            } catch (e) {
+                console.error('创建音频占位符失败:', e);
+            }
+            
+            return false;
+        }
+    }
+
+    // 更新加载状态
+    function updateLoadingStatus(message, progress) {
+        // 更新加载进度条
+        if (loadingProgressBar) {
+            loadingProgressBar.style.width = `${progress}%`;
+        }
+        
+        // 更新加载状态文本
+        if (loadingStatus) {
+            loadingStatus.textContent = message;
+        }
+        
+        console.log(`加载进度 ${progress}%: ${message}`);
+    }
 }); 
