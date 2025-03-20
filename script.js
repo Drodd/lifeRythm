@@ -775,12 +775,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // 首先准备所有需要加载的音频文件信息
             const audioFiles = [];
             
-            // 添加基础节奏音频
+            // 添加基础节奏音频（优先级最高）
             audioFiles.push({ 
                 id: 'base_rhythm', 
                 filename: 'base_rhythm',
                 loaded: false,
-                attempts: 0
+                attempts: 0,
+                priority: 1 // 优先级最高
             });
             
             // 添加所有行动对应的音频
@@ -790,9 +791,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: action, 
                     filename: soundFileName,
                     loaded: false,
-                    attempts: 0
+                    attempts: 0,
+                    priority: 2 // 普通优先级
                 });
             }
+            
+            // 按优先级排序
+            audioFiles.sort((a, b) => a.priority - b.priority);
             
             // 计算每个音频文件的加载进度权重
             const totalFiles = audioFiles.length;
@@ -800,15 +805,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const maxProgress = 95; // 最大进度
             const progressPerFile = (maxProgress - baseProgress) / totalFiles;
             
-            // 分批加载音频文件，每批最多3个
-            const batchSize = 3;
-            const maxAttempts = 3;
+            // 检测是否为移动设备
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // 根据设备类型设置每批加载数量，移动设备更少
+            const batchSize = isMobile ? 2 : 3;
+            // 增加移动设备的最大尝试次数
+            const maxAttempts = isMobile ? 4 : 3;
             let loadSuccessCount = 0;
             let loadFailCount = 0;
             
-            console.log(`开始分批加载音频，每批${batchSize}个文件`);
+            console.log(`开始分批加载音频，每批${batchSize}个文件，设备类型: ${isMobile ? '移动' : '桌面'}`);
             window.debugLog && window.debugLog(`分批加载音频，每批${batchSize}个`);
             updateLoadingStatus(`开始加载音频文件 (0/${totalFiles})`, baseProgress);
+            
+            // 显示音频加载进度条
+            showAudioLoadingProgressBar();
             
             // 分批加载函数
             async function loadBatch(startIndex) {
@@ -818,6 +830,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.debugLog && window.debugLog(`音频加载: 成功 ${loadSuccessCount}, 失败 ${loadFailCount}`);
                     updateLoadingStatus(`音频加载完成: 成功 ${loadSuccessCount} 个, 失败 ${loadFailCount} 个`, 95);
                     
+                    // 隐藏音频加载进度条
+                    hideAudioLoadingProgressBar();
+                    
                     // 检查是否有未加载的音频需要重试
                     const unloadedFiles = audioFiles.filter(file => !file.loaded && file.attempts < maxAttempts);
                     
@@ -826,9 +841,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.debugLog && window.debugLog(`重试加载 ${unloadedFiles.length} 个音频`);
                         updateLoadingStatus(`重试加载失败的音频文件 (${unloadedFiles.length}个)...`, 95);
                         
+                        // 重新显示加载进度条
+                        showAudioLoadingProgressBar(`重试加载 (${unloadedFiles.length}个)`);
+                        
                         // 重置索引，开始重试
                         for (const file of unloadedFiles) {
                             file.attempts++;
+                        }
+                        
+                        // 在移动设备上添加延迟，给浏览器一些恢复时间
+                        if (isMobile) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
                         }
                         
                         // 重新加载第一批未加载的文件
@@ -873,6 +896,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`加载第 ${batchNumber}/${totalBatches} 批音频 (${currentBatch.length} 个文件)`);
                 window.debugLog && window.debugLog(`加载第 ${batchNumber} 批音频`);
                 updateLoadingStatus(`加载音频 - 批次 ${batchNumber}/${totalBatches}`, baseProgress + progressPerFile * startIndex);
+                
+                // 更新音频加载进度条
+                updateAudioLoadingProgress((startIndex / audioFiles.length) * 100);
                 
                 // 找出当前批次中未加载且尝试次数小于最大尝试次数的文件
                 const filesToLoad = currentBatch.filter(file => !file.loaded && file.attempts < maxAttempts);
@@ -925,7 +951,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 await Promise.all(promises);
                 
                 // 短暂延迟，让浏览器有时间释放连接
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // 移动设备上使用更长的延迟
+                const delayTime = isMobile ? 800 : 500;
+                await new Promise(resolve => setTimeout(resolve, delayTime));
                 
                 // 加载下一批
                 return loadBatch(endIndex);
@@ -938,6 +966,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('初始化音频失败:', error);
             window.debugLog && window.debugLog(`音频初始化失败: ${error.message}`);
+            
+            // 隐藏音频加载进度条
+            hideAudioLoadingProgressBar();
             
             // 初始化备用音效
             console.log('使用备用音效系统');
@@ -962,6 +993,112 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.debugLog && window.debugLog(`备用音效初始化失败: ${fallbackError.message}`);
                 return false;
             }
+        }
+    }
+
+    // 显示音频加载进度条
+    function showAudioLoadingProgressBar(title = '加载音频中') {
+        // 检查是否已存在进度条
+        let progressContainer = document.getElementById('audio-loading-progress-container');
+        if (progressContainer) {
+            // 如果存在则更新标题
+            const titleElement = progressContainer.querySelector('.audio-loading-title');
+            if (titleElement) {
+                titleElement.textContent = title;
+            }
+            progressContainer.style.display = 'flex';
+            return;
+        }
+        
+        // 创建进度条容器
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'audio-loading-progress-container';
+        progressContainer.style.position = 'fixed';
+        progressContainer.style.top = '50%';
+        progressContainer.style.left = '50%';
+        progressContainer.style.transform = 'translate(-50%, -50%)';
+        progressContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        progressContainer.style.padding = '20px';
+        progressContainer.style.borderRadius = '10px';
+        progressContainer.style.zIndex = '9999';
+        progressContainer.style.display = 'flex';
+        progressContainer.style.flexDirection = 'column';
+        progressContainer.style.alignItems = 'center';
+        progressContainer.style.color = 'white';
+        progressContainer.style.width = '80%';
+        progressContainer.style.maxWidth = '400px';
+        
+        // 添加标题
+        const titleElement = document.createElement('div');
+        titleElement.className = 'audio-loading-title';
+        titleElement.textContent = title;
+        titleElement.style.marginBottom = '10px';
+        titleElement.style.fontWeight = 'bold';
+        progressContainer.appendChild(titleElement);
+        
+        // 添加进度条背景
+        const progressBarBg = document.createElement('div');
+        progressBarBg.className = 'audio-loading-progress-bg';
+        progressBarBg.style.width = '100%';
+        progressBarBg.style.height = '10px';
+        progressBarBg.style.backgroundColor = '#444';
+        progressBarBg.style.borderRadius = '5px';
+        progressBarBg.style.overflow = 'hidden';
+        
+        // 添加进度条前景
+        const progressBar = document.createElement('div');
+        progressBar.className = 'audio-loading-progress';
+        progressBar.style.width = '0%';
+        progressBar.style.height = '100%';
+        progressBar.style.backgroundColor = '#4CAF50';
+        progressBar.style.borderRadius = '5px';
+        progressBar.style.transition = 'width 0.3s ease';
+        
+        progressBarBg.appendChild(progressBar);
+        progressContainer.appendChild(progressBarBg);
+        
+        // 添加进度文本
+        const progressText = document.createElement('div');
+        progressText.className = 'audio-loading-progress-text';
+        progressText.textContent = '0%';
+        progressText.style.marginTop = '5px';
+        progressContainer.appendChild(progressText);
+        
+        // 添加到页面
+        document.body.appendChild(progressContainer);
+    }
+    
+    // 更新音频加载进度
+    function updateAudioLoadingProgress(percent) {
+        const progressContainer = document.getElementById('audio-loading-progress-container');
+        if (!progressContainer) return;
+        
+        const progressBar = progressContainer.querySelector('.audio-loading-progress');
+        const progressText = progressContainer.querySelector('.audio-loading-progress-text');
+        
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${Math.round(percent)}%`;
+        }
+    }
+    
+    // 隐藏音频加载进度条
+    function hideAudioLoadingProgressBar() {
+        const progressContainer = document.getElementById('audio-loading-progress-container');
+        if (progressContainer) {
+            // 渐变消失
+            progressContainer.style.opacity = '0';
+            progressContainer.style.transition = 'opacity 0.5s ease';
+            
+            // 一段时间后移除
+            setTimeout(() => {
+                if (progressContainer.parentNode) {
+                    progressContainer.parentNode.removeChild(progressContainer);
+                }
+            }, 500);
         }
     }
 
@@ -1015,46 +1152,70 @@ document.addEventListener('DOMContentLoaded', () => {
         window.debugLog && window.debugLog(`音频文件URL: ${absoluteUrl}`);
         
         return new Promise((resolve, reject) => {
+            // 检测是否为移动设备
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // 移动设备使用更长的超时时间
+            const timeoutDuration = isMobile ? 15000 : 10000;
+            
             // 添加超时处理
             const timeoutId = setTimeout(() => {
                 console.warn(`加载音频${filename}超时`);
                 window.debugLog && window.debugLog(`音频加载超时: ${filename}.mp3`);
                 reject(new Error('加载超时'));
-            }, 10000); // 10秒超时
+            }, timeoutDuration);
             
             // 检查文件是否存在
-            fetch(absoluteUrl)
-                .then(response => {
-                    console.log(`音频文件 ${filename}.mp3 响应状态:`, response.status);
-                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 响应状态: ${response.status}`);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP错误! 状态: ${response.status}`);
-                    }
-                    return response.arrayBuffer();
-                })
-                .then(arrayBuffer => {
-                    console.log(`音频文件 ${filename}.mp3 成功获取为ArrayBuffer, 大小: ${arrayBuffer.byteLength} 字节`);
-                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 大小: ${arrayBuffer.byteLength} 字节`);
-                    
+            fetch(absoluteUrl, {
+                // 添加缓存控制，避免移动浏览器缓存失败的请求
+                cache: 'no-store',
+                // 增加优先级
+                priority: 'high'
+            })
+            .then(response => {
+                console.log(`音频文件 ${filename}.mp3 响应状态:`, response.status);
+                window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 响应状态: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
+                }
+                return response.arrayBuffer();
+            })
+            .then(arrayBuffer => {
+                console.log(`音频文件 ${filename}.mp3 成功获取为ArrayBuffer, 大小: ${arrayBuffer.byteLength} 字节`);
+                window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 大小: ${arrayBuffer.byteLength} 字节`);
+                
+                if (!audioContext) {
+                    throw new Error('音频上下文不存在');
+                }
+                
+                // 在移动设备上，解码前添加短暂延迟，避免同时解码多个文件
+                if (isMobile) {
+                    return new Promise(resolve => {
+                        setTimeout(() => {
+                            resolve(audioContext.decodeAudioData(arrayBuffer));
+                        }, 100);
+                    });
+                } else {
                     return audioContext.decodeAudioData(arrayBuffer);
-                })
-                .then(audioBuffer => {
-                    // 清除超时
-                    clearTimeout(timeoutId);
-                    
-                    console.log(`音频文件 ${filename}.mp3 成功解码为AudioBuffer, 时长: ${audioBuffer.duration}秒`);
-                    window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 解码成功, 时长: ${audioBuffer.duration}秒`);
-                    resolve(audioBuffer);
-                })
-                .catch(error => {
-                    // 清除超时
-                    clearTimeout(timeoutId);
-                    
-                    console.error(`加载音频${filename}失败:`, error);
-                    window.debugLog && window.debugLog(`音频加载失败: ${filename}.mp3 - ${error.message}`);
-                    reject(error);
-                });
+                }
+            })
+            .then(audioBuffer => {
+                // 清除超时
+                clearTimeout(timeoutId);
+                
+                console.log(`音频文件 ${filename}.mp3 成功解码为AudioBuffer, 时长: ${audioBuffer.duration}秒`);
+                window.debugLog && window.debugLog(`音频文件 ${filename}.mp3 解码成功, 时长: ${audioBuffer.duration}秒`);
+                resolve(audioBuffer);
+            })
+            .catch(error => {
+                // 清除超时
+                clearTimeout(timeoutId);
+                
+                console.error(`加载音频${filename}失败:`, error);
+                window.debugLog && window.debugLog(`音频加载失败: ${filename}.mp3 - ${error.message}`);
+                reject(error);
+            });
         });
     }
     
