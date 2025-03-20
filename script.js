@@ -1722,7 +1722,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 如果达到解锁条件，自动解锁新行动
         if (currentKnowledge >= requiredKnowledge) {
-            // 满足解锁条件，随机选择一个行动解锁
+            // 获取下一个可解锁的行动
+            const nextAction = getNextUnlockableAction();
+            if (nextAction) {
+                // 自动解锁新行动
+                console.log(`见闻值达到要求(${requiredKnowledge})，自动解锁新行动: ${nextAction}`);
+                addAction(nextAction);
+                
+                // 消耗见闻值
+                updatePlayerStat('见闻', currentKnowledge - requiredKnowledge);
+                
+                // 更新显示
+                updateStatsDisplay();
+                
+                // 递归调用以检查是否可以解锁更多行动
+                updateUnlockButtonState();
+                return;
+            }
+            
+            // 如果没有找到可解锁的行动但仍有可解锁的空间（不应该发生）
             addTrackButton.textContent = "领悟新行动";
             addTrackButton.disabled = false;
             addTrackButton.classList.remove('disabled');
@@ -2408,8 +2426,18 @@ document.addEventListener('DOMContentLoaded', () => {
             unlockButton.addEventListener('click', () => {
                 const action = getNextUnlockableAction();
                 if (action) {
-                    // 解锁新行动
-                    unlockNewAction(action);
+                    // 使用addAction替代未定义的unlockNewAction
+                    addAction(action);
+                    
+                    // 消耗见闻值
+                    const requiredKnowledge = getNextUnlockRequirement();
+                    updatePlayerStat('见闻', playerStats.见闻 - requiredKnowledge);
+                    
+                    // 更新显示
+                    updateStatsDisplay();
+                    
+                    // 更新解锁按钮状态
+                    updateUnlockButtonState();
                 }
             });
             
